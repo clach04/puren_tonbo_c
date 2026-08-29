@@ -15,70 +15,72 @@
 
 #define FILTER_DEBOUNCE_MS 250
 
-/* Menu command IDs (arrive via WM_COMMAND with lParam == 0).
- * NOTE: control IDs (ID_*) overlap the 2000s range; menu commands are
- * distinguished by the lParam == 0 guard in WM_COMMAND handling. */
-enum {
-  IDM_NEW           = 1001,
-  IDM_OPEN          = 1002,
-  IDM_SAVE          = 1003,
-  IDM_SAVEAS        = 1004,
-  IDM_RENAMEFILE    = 1005,
-  IDM_EXIT          = 1006,
-  IDM_UNDO          = 1010,
-  IDM_CUT           = 1011,
-  IDM_COPY          = 1012,
-  IDM_PASTE         = 1013,
-  IDM_FIND          = 1014,
-  IDM_FINDNEXT      = 1015,
-  IDM_FINDPREV      = 1016,
-  IDM_WORDWRAP      = 1020,
-  IDM_FUZZYSEARCH   = 1021,
-  IDM_ABOUT         = 1030,
-  IDM_EXPANDALL     = 1031,
-  IDM_COLLAPSEALL   = 1032,
-  IDM_FORGETPASSWORD = 1040,
-  IDM_OPEN_DIR      = 2001,
-  IDM_OPEN_ASSOC    = 2002,
-  IDM_NEW_FOLDER    = 2003,
-  IDM_ENCRYPT_FILE  = 2004,
-  IDM_DECRYPT_FILE  = 2005,
-  IDM_RENAME        = 2006,
-  IDM_COPY_PATH     = 2007
-};
-
 /* Timer IDs */
 enum {
   IDT_PASSWORD = 1,
   IDT_FILTER   = 2
 };
 
-/* Child control IDs */
+/* Child control IDs (never reuse values from other ID ranges) */
 enum {
-  ID_TREE     = 2001,
-  ID_EDITOR   = 2002,
-  ID_STATUS   = 2003,
-  ID_SPLITTER = 2004,
-  ID_SEARCH   = 2005
+  ID_TREE = 1000,
+  ID_EDITOR,
+  ID_STATUS,
+  ID_SPLITTER,
+  ID_SEARCH
 };
 
 /* Password dialog control IDs */
 enum {
-  IDC_PASS_EDIT    = 3001,
-  IDC_PASS_CONFIRM = 3002,
-  IDC_PASS_OK      = 3003,
-  IDC_PASS_CANCEL  = 3004,
-  IDC_PASS_EDIT2   = 3005,
-  IDC_PASS_SHOW    = 3006
+  IDC_PASS_EDIT = 10000,
+  IDC_PASS_CONFIRM,
+  IDC_PASS_OK,
+  IDC_PASS_CANCEL,
+  IDC_PASS_EDIT2,
+  IDC_PASS_SHOW
 };
 
 /* Find dialog control IDs */
 enum {
-  IDC_FIND_EDIT  = 3101,
-  IDC_FIND_NEXT  = 3102,
-  IDC_FIND_PREV  = 3103,
-  IDC_FIND_CLOSE = 3104
+  IDC_FIND_EDIT = 11000,
+  IDC_FIND_NEXT,
+  IDC_FIND_PREV,
+  IDC_FIND_CLOSE
 };
+
+/* Menu command IDs (arrive via WM_COMMAND with lParam == 0).
+ * Ranges are disjoint by design: controls 1000-2000, password dialog
+ * 10000+, find dialog 11000+, menu commands 20000+. The lParam == 0
+ * guard in WM_COMMAND handling is kept as defense in depth. */
+enum {
+  IDM_NEW = 20000,
+  IDM_OPEN,
+  IDM_SAVE,
+  IDM_SAVEAS,
+  IDM_RENAMEFILE,
+  IDM_EXIT,
+  IDM_UNDO,
+  IDM_CUT,
+  IDM_COPY,
+  IDM_PASTE,
+  IDM_FIND,
+  IDM_FINDNEXT,
+  IDM_FINDPREV,
+  IDM_WORDWRAP,
+  IDM_FUZZYSEARCH,
+  IDM_ABOUT,
+  IDM_EXPANDALL,
+  IDM_COLLAPSEALL,
+  IDM_FORGETPASSWORD,
+  IDM_OPEN_DIR,
+  IDM_OPEN_ASSOC,
+  IDM_NEW_FOLDER,
+  IDM_ENCRYPT_FILE,
+  IDM_DECRYPT_FILE,
+  IDM_RENAME,
+  IDM_COPY_PATH
+};
+
 #define WM_START_LABEL_EDIT (WM_APP + 1)
 #define WM_CLI_OPEN (WM_APP + 2)
 
@@ -568,10 +570,11 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPara
   }
 
   case WM_COMMAND:
-    /* Only menu/accelerator commands here (lParam == 0). Control
+    /* Paranoid, but fast/cheap sanity/protection check to avoid problems with dupe IDs.
+     * Only menu/accelerator commands here (lParam == 0). Control
      * notifications (EN_*, etc.) carry the control HWND in lParam and
-     * their control IDs collide with IDM_* values (e.g. ID_EDITOR 2002
-     * vs IDM_OPEN_ASSOC 2002), so they must not reach the switch. */
+     * their notification codes would be misread as command IDs if they
+     * reached the switch. */
     if (lParam != 0)
       return 0;
     if (LOWORD(wParam) == ID_SEARCH && HIWORD(wParam) == EN_CHANGE) {
