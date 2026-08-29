@@ -833,6 +833,7 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPara
             AppendMenuA(hPopup, MF_STRING, IDM_OPEN_DIR, "Open Directory");
           if (g_rightClickPath[0])
             AppendMenuA(hPopup, MF_STRING, IDM_COPY_PATH, "Copy Full Name to Clipboard");
+          AppendMenuA(hPopup, MF_SEPARATOR, 0, NULL);
           AppendMenuA(hPopup, MF_STRING, IDM_RENAME, "Rename");
           AppendMenuA(hPopup, MF_SEPARATOR, 0, NULL);
         }
