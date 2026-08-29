@@ -50,6 +50,14 @@ zig cc -Wno-attributes -std=c99 -Ichi_c/src/ -Ichi_c/src/openssh_shim -Ichi_c/sr
 
 Run `tonbo.exe`. The left pane shows a file tree; double-click a file to open it, or use keyboard and enter/return key.
 
+### Command line
+
+`tonbo.exe [path]` - optional single argument, either a directory or a file:
+
+  * Directory: the tree is rooted at that directory (for this session only, `last_dir` in `tonbo.ini` is not changed).
+  * File (.txt, .md, .chi, .chs): the file is opened in the editor and the tree is rooted at its containing directory ("Root" selected, as at normal startup). Encrypted files prompt for a password as usual.
+  * A nonexistent path or unsupported file type shows a warning and startup continues normally.
+
 ### Keyboard Shortcuts
 
   * Ctrl+N - New file

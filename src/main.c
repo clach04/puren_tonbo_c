@@ -63,6 +63,7 @@
 #define IDM_DECRYPT_FILE 2005
 #define IDM_RENAME       2006
 #define WM_START_LABEL_EDIT (WM_APP + 1)
+#define WM_CLI_OPEN (WM_APP + 2)
 
 static HINSTANCE g_hInst;
 static HWND g_hWnd;
@@ -78,6 +79,9 @@ static char g_curDir[MAX_PATH];
 static BOOL g_dirty;
 static HFONT g_hFont;
 static wchar_t g_findText[256];
+
+static char g_cliDir[MAX_PATH];
+static char g_cliFile[MAX_PATH];
 
 static char g_cached_pass[256];
 static int g_pass_cached;
@@ -121,7 +125,9 @@ static void EncryptFileToDisk(const char *path);
 static void DecryptFileToDisk(const char *path);
 static int is_chi_file(const char *path);
 static void SearchSnapshot(void);
-static void SearchApply(HWND hWnd);
+static HTREEITEM FindTreeItemByPath(HWND hTree, HTREEITEM hParent, const char *path);
+static void SelectTreeItemByPath(const char *path);
+static void SearchSnapshot(void);static void SearchApply(HWND hWnd);
 static void SearchClear(int focusTree);
 static void FreeFilterCache(void);
 static int SubstrPos(const char *hay, const char *needle);
@@ -159,6 +165,50 @@ static int is_note_ext(const char *name) {
   return !_stricmp(dot, ".txt") || !_stricmp(dot, ".chi") || !_stricmp(dot, ".chs") || !_stricmp(dot, ".md");
 }
 
+/* Parse command line: single optional positional argument, either a
+ * directory (tree root) or a file (open in editor, tree rooted at its
+ * parent directory). Uses wide command line for Unicode path support;
+ * paths converted to the app's internal ANSI representation. */
+static void ParseCommandLineArgs(char *cliDir, int cliDirSize, char *cliFile, int cliFileSize) {
+  int argc = 0;
+  wchar_t **argvW;
+
+  cliDir[0] = '\0';
+  cliFile[0] = '\0';
+
+  argvW = CommandLineToArgvW(GetCommandLineW(), &argc);
+  if (!argvW) return;
+  if (argc > 1) {
+    char path[MAX_PATH];
+    DWORD attrs;
+
+    path[0] = '\0';
+    WideCharToMultiByte(CP_ACP, 0, argvW[1], -1, path, sizeof(path), NULL, NULL);
+    attrs = GetFileAttributes(path);
+    if (attrs == INVALID_FILE_ATTRIBUTES) {
+      MessageBox(NULL, path, "Path not found", MB_OK | MB_ICONWARNING);
+    } else if (attrs & FILE_ATTRIBUTE_DIRECTORY) {
+      strncpy(cliDir, path, cliDirSize - 1);
+      cliDir[cliDirSize - 1] = '\0';
+    } else if (is_note_ext(path)) {
+      char *slash;
+      strncpy(cliFile, path, cliFileSize - 1);
+      cliFile[cliFileSize - 1] = '\0';
+      slash = strrchr(cliFile, '\\');
+      if (slash) {
+        int dirlen = (int)(slash - cliFile);
+        memcpy(cliDir, cliFile, dirlen);
+        cliDir[dirlen] = '\0';
+      } else {
+        GetCurrentDirectoryA(cliDirSize, cliDir);
+      }
+    } else {
+      MessageBox(NULL, path, "Unsupported file type", MB_OK | MB_ICONWARNING);
+    }
+  }
+  LocalFree(argvW);
+}
+
 int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrev, LPSTR cmdLine, int nShow) {
   WNDCLASSEX wc;
   MSG msg;
@@ -168,6 +218,8 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrev, LPSTR cmdLine, int nShow) {
   g_hInst = hInst;
 
   config_load(&g_cfg, CFG_PATH);
+
+  ParseCommandLineArgs(g_cliDir, sizeof(g_cliDir), g_cliFile, sizeof(g_cliFile));
 
   icc.dwSize = sizeof(icc);
   icc.dwICC = ICC_TREEVIEW_CLASSES;
@@ -433,11 +485,17 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPara
     SetEditorFont(g_hEditor);
     SendMessage(g_hEditor, EM_SETLIMITTEXT, 0, 0);
 
-    if (g_cfg.last_dir[0]) strncpy(g_curDir, g_cfg.last_dir, MAX_PATH - 1);
+    if (g_cliDir[0]) strncpy(g_curDir, g_cliDir, MAX_PATH - 1);
+    else if (g_cfg.last_dir[0]) strncpy(g_curDir, g_cfg.last_dir, MAX_PATH - 1);
     else GetCurrentDirectory(MAX_PATH, g_curDir);
     g_treeW = g_cfg.tree_w;
     RefreshTree();
     SetFocus(g_hTree);
+    if (g_cliFile[0]) {
+      /* Defer opening: the password dialog is modal against the main
+       * window, which is not visible yet during WM_CREATE. */
+      PostMessage(hWnd, WM_CLI_OPEN, 0, 0);
+    }
     if (g_cfg.password_timeout > 0)
       SetTimer(hWnd, IDT_PASSWORD, 1000, NULL);
     return 0;
@@ -866,6 +924,14 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPara
     return 0;
   }
 
+  case WM_CLI_OPEN: /* deferred command line file open */
+    if (g_cliFile[0]) {
+      BF01OpenFile(g_cliFile);
+      SetFocus(g_hTree); /* keep tree focused on startup, as usual */
+      g_cliFile[0] = '\0';
+    }
+    return 0;
+
   case WM_CLOSE:
     if (PromptSave() == IDCANCEL) return 0;
     PasswordCache_Clear();
@@ -1142,8 +1208,7 @@ static void CollectTreePaths(HWND hTree, HTREEITEM hItem) {
 
 /* Called at first keystroke of a filtering session: snapshot expansion
    state and cache all item paths (tree gets rebuilt during filtering). */
-static void SearchSnapshot(void) {
-  FreeExpandedState();
+static void SearchSnapshot(void) {  FreeExpandedState();
   if (g_hTree && g_curDir[0])
     CaptureExpandedState(g_hTree, TreeView_GetRoot(g_hTree));
   g_filterSnap = g_expandedPaths;
@@ -1453,7 +1518,44 @@ static void BF01OpenFileRaw(const unsigned char *raw, long rawlen) {
   }
 }
 
+/* Recursively find the tree item whose lParam path matches path (case-insensitive). */
+static HTREEITEM FindTreeItemByPath(HWND hTree, HTREEITEM hParent, const char *path) {
+  HTREEITEM hItem;
+  TVITEM ti;
+  char itemPath[MAX_PATH];
+
+  if (!hTree) return NULL;
+  hItem = TreeView_GetChild(hTree, hParent);
+  while (hItem) {
+    ZeroMemory(&ti, sizeof(ti));
+    ti.mask = TVIF_PARAM | TVIF_HANDLE;
+    ti.hItem = hItem;
+    if (TreeView_GetItem(hTree, &ti) && ti.lParam) {
+      strncpy(itemPath, (const char *)ti.lParam, MAX_PATH - 1);
+      itemPath[MAX_PATH - 1] = '\0';
+      if (!_stricmp(itemPath, path)) return hItem;
+      /* search inside subdirectories (dirs have non-note-extension paths) */
+      if (!is_note_ext(itemPath)) {
+        HTREEITEM hFound = FindTreeItemByPath(hTree, hItem, path);
+        if (hFound) return hFound;
+      }
+    }
+    hItem = TreeView_GetNextSibling(hTree, hItem);
+  }
+  return NULL;
+}
+
+static void SelectTreeItemByPath(const char *path) {
+  HTREEITEM hRoot = TreeView_GetRoot(g_hTree);
+  HTREEITEM hItem = FindTreeItemByPath(g_hTree, hRoot, path);
+  if (hItem) {
+    TreeView_SelectItem(g_hTree, hItem);
+    TreeView_EnsureVisible(g_hTree, hItem);
+  }
+}
+
 static void BF01OpenFile(const char *path) {
+  SelectTreeItemByPath(path);
   if (is_chi_file(path)) {
     char pass[256] = "";
     FILE *fin;

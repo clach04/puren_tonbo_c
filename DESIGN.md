@@ -117,6 +117,7 @@ Character encoding conversion module using Win32 APIs:
   * **RefreshTree after save**: Tree is repopulated after save to reflect any filename changes.
   * **Conditional config save**: Do not save config, if config has not changed. On exit (`WM_CLOSE`), config is only written to disk if it differs from the originally loaded values. Saves a copy of loaded config before applying live window geometry, then compares with `config_equal` before calling `config_save`. Avoids unnecessary disk writes when nothing changed.
   * **Unicode encoding support**: EDIT control created with `CreateWindowExW` (native Unicode). File content converted between file encoding and UTF-16 via `encoding_to_wide`/`wide_to_encoding`. Encoding list configured via `encoding_list` INI setting. On load: BOM detection first, then try each encoding in order with UTF-8 strict validation (`MB_ERR_INVALID_CHARS`). On save: use first encoding in list (or file's original encoding). Tree view stays ANSI (system codepage filenames). Title/status bar use ANSI path strings converted via `MultiByteToWideChar` only at API boundaries.
+  * **Command line arguments**: Single optional positional argument, parsed in `WinMain` via `ParseCommandLineArgs()` (`GetCommandLineW()` + `CommandLineToArgvW()` for Unicode paths, converted to the app's internal ANSI paths). A directory becomes the tree root for the session (overrides `last_dir` without writing config); a note file (.txt/.md/.chi/.chs) is opened via the existing `BF01OpenFile` flow after `RefreshTree`, with the tree rooted at its parent directory and "Root" selected. A nonexistent path or unsupported extension shows a warning message box and startup falls back to normal behavior (`last_dir`). Extra arguments are ignored.
 
 ## Build & Test
 
@@ -156,7 +157,6 @@ Character encoding conversion module using Win32 APIs:
   * Delete File support
   * working find/search support
   * Icon support (tree has placeholder image indices 0/1 but no actual image list)
-  * support command line arguments, for example file to open, folder to use as root
   * add a view-only mode, to prevent accidental editing and/or deleting
   * support external editor support, under config
   * support templates/snippets, e.g. today's date, time, timestamp, and static text in config file
