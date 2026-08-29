@@ -178,7 +178,7 @@ Encrypt/Decrypt from context menu:
 
 ### Implementation notes
 
-  * `NM_RCLICK` notification triggers the popup; `TVM_HITTEST` selects the item under cursor
+  * `NM_RCLICK` notification triggers the popup; `TVM_HITTEST` selects the item under cursor. `GetMessagePos()` returns *screen* coordinates: a client-space copy is used for the hit-test, and the original point is passed directly to `TrackPopupMenu` (converting it again via `ClientToScreen` offsets the menu by the tree's screen origin).
   * Command IDs `IDM_OPEN_DIR`, `IDM_OPEN_ASSOC`, `IDM_NEW_FOLDER`, `IDM_ENCRYPT_FILE`, `IDM_DECRYPT_FILE` in WM_COMMAND
   * `g_rightClickPath` + `g_rightClickItem` globals carry context from NM_RCLICK to WM_COMMAND
   * Tree uses `TVS_EDITLABELS` for in-place label editing (F2); `TVN_BEGINLABELEDITW` blocks root edit; `TVN_ENDLABELEDITW` renames on disk via `MoveFile` and updates `lParam`
