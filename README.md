@@ -25,12 +25,11 @@ Partially compatible with https://github.com/clach04/puren_tonbo
 
 Has dependencies on other libraries:
 
+    # TODO skip the cd?
     cd src
     git clone https://github.com/clach04/chi_c.git
-    # TODO skip the cd
-    cd chi_c
-    cd src
-    git clone https://github.com/clach04/openssh-portable.git
+    # NOTE only need md5 and blowfish files, not the entire repo
+    git clone https://github.com/clach04/openssh-portable.git chi_c/src/openssh-portable
 
 Requires mingw gcc on Windows:
 
