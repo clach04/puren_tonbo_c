@@ -1564,16 +1564,18 @@ static void BF01OpenFile(const char *path) {
     unsigned char *plain;
     size_t plainlen;
 
-    if (!AskPassword(pass, sizeof(pass), 0))
+    if (!AskPassword(pass, sizeof(pass), 0)) {
+      SetFocus(g_hTree);
       return;
+    }
 
     fin = fopen(path, "rb");
-    if (!fin) { MessageBox(g_hWnd, "Cannot open file", "Error", MB_OK | MB_ICONERROR); return; }
+    if (!fin) { MessageBox(g_hWnd, "Cannot open file", "Error", MB_OK | MB_ICONERROR); SetFocus(g_hTree); return; }
     fseek(fin, 0, SEEK_END);
     filesize = ftell(fin);
     rewind(fin);
     filedata = (unsigned char *)malloc(filesize);
-    if (!filedata) { fclose(fin); MessageBox(g_hWnd, "Out of memory", "Error", MB_OK | MB_ICONERROR); return; }
+    if (!filedata) { fclose(fin); MessageBox(g_hWnd, "Out of memory", "Error", MB_OK | MB_ICONERROR); SetFocus(g_hTree); return; }
     fread(filedata, 1, filesize, fin);
     fclose(fin);
 
@@ -1581,6 +1583,7 @@ static void BF01OpenFile(const char *path) {
     free(filedata);
     if (!plain) {
       MessageBox(g_hWnd, "Decryption failed (wrong password?)", "Error", MB_OK | MB_ICONERROR);
+      SetFocus(g_hTree);
       return;
     }
     PasswordCache_Set(pass);
@@ -2071,7 +2074,7 @@ static int AskPassword(char *passBuf, int bufsize, int encrypt) {
 
   EnableWindow(g_hWnd, TRUE);
   SetForegroundWindow(g_hWnd);
-  if (g_passOk) SetFocus(g_hTree);
+  SetFocus(g_hTree); /* restore tree focus on success AND cancel/failure */
   DeleteObject(hDlgFont);
   return g_passOk;
 }
