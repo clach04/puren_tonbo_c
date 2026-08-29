@@ -15,54 +15,70 @@
 
 #define FILTER_DEBOUNCE_MS 250
 
-#define IDM_NEW      1001
-#define IDM_OPEN     1002
-#define IDM_SAVE     1003
-#define IDM_SAVEAS   1004
-#define IDM_RENAMEFILE 1005
-#define IDM_EXIT     1006
-#define IDM_UNDO     1010
-#define IDM_CUT      1011
-#define IDM_COPY     1012
-#define IDM_PASTE    1013
-#define IDM_FIND     1014
-#define IDM_FINDNEXT 1015
-#define IDM_FINDPREV 1016
-#define IDM_WORDWRAP 1020
-#define IDM_FUZZYSEARCH 1021
-#define IDM_FORGETPASSWORD 1040
-#define IDM_ABOUT    1030
-#define IDM_EXPANDALL 1031
-#define IDM_COLLAPSEALL 1032
+/* Menu command IDs (arrive via WM_COMMAND with lParam == 0).
+ * NOTE: control IDs (ID_*) overlap the 2000s range; menu commands are
+ * distinguished by the lParam == 0 guard in WM_COMMAND handling. */
+enum {
+  IDM_NEW           = 1001,
+  IDM_OPEN          = 1002,
+  IDM_SAVE          = 1003,
+  IDM_SAVEAS        = 1004,
+  IDM_RENAMEFILE    = 1005,
+  IDM_EXIT          = 1006,
+  IDM_UNDO          = 1010,
+  IDM_CUT           = 1011,
+  IDM_COPY          = 1012,
+  IDM_PASTE         = 1013,
+  IDM_FIND          = 1014,
+  IDM_FINDNEXT      = 1015,
+  IDM_FINDPREV      = 1016,
+  IDM_WORDWRAP      = 1020,
+  IDM_FUZZYSEARCH   = 1021,
+  IDM_ABOUT         = 1030,
+  IDM_EXPANDALL     = 1031,
+  IDM_COLLAPSEALL   = 1032,
+  IDM_FORGETPASSWORD = 1040,
+  IDM_OPEN_DIR      = 2001,
+  IDM_OPEN_ASSOC    = 2002,
+  IDM_NEW_FOLDER    = 2003,
+  IDM_ENCRYPT_FILE  = 2004,
+  IDM_DECRYPT_FILE  = 2005,
+  IDM_RENAME        = 2006,
+  IDM_COPY_PATH     = 2007
+};
 
-#define IDT_PASSWORD 1
-#define IDT_FILTER   2
+/* Timer IDs */
+enum {
+  IDT_PASSWORD = 1,
+  IDT_FILTER   = 2
+};
 
-#define ID_TREE      2001
-#define ID_EDITOR    2002
-#define ID_STATUS    2003
-#define ID_SPLITTER  2004
-#define ID_SEARCH    2005
+/* Child control IDs */
+enum {
+  ID_TREE     = 2001,
+  ID_EDITOR   = 2002,
+  ID_STATUS   = 2003,
+  ID_SPLITTER = 2004,
+  ID_SEARCH   = 2005
+};
 
-#define IDC_PASS_EDIT    3001
-#define IDC_PASS_CONFIRM 3002
-#define IDC_PASS_OK      3003
-#define IDC_PASS_CANCEL  3004
-#define IDC_PASS_EDIT2   3005
-#define IDC_PASS_SHOW    3006
+/* Password dialog control IDs */
+enum {
+  IDC_PASS_EDIT    = 3001,
+  IDC_PASS_CONFIRM = 3002,
+  IDC_PASS_OK      = 3003,
+  IDC_PASS_CANCEL  = 3004,
+  IDC_PASS_EDIT2   = 3005,
+  IDC_PASS_SHOW    = 3006
+};
 
-#define IDC_FIND_EDIT  3101
-#define IDC_FIND_NEXT  3102
-#define IDC_FIND_PREV  3103
-#define IDC_FIND_CLOSE 3104
-
-#define IDM_OPEN_DIR     2001
-#define IDM_OPEN_ASSOC   2002
-#define IDM_NEW_FOLDER   2003
-#define IDM_ENCRYPT_FILE 2004
-#define IDM_DECRYPT_FILE 2005
-#define IDM_RENAME       2006
-#define IDM_COPY_PATH    2007
+/* Find dialog control IDs */
+enum {
+  IDC_FIND_EDIT  = 3101,
+  IDC_FIND_NEXT  = 3102,
+  IDC_FIND_PREV  = 3103,
+  IDC_FIND_CLOSE = 3104
+};
 #define WM_START_LABEL_EDIT (WM_APP + 1)
 #define WM_CLI_OPEN (WM_APP + 2)
 
