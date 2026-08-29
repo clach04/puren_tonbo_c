@@ -181,7 +181,11 @@ static void PasswordCache_ResetTimer(void) {
 static int is_note_ext(const char *name) {
   const char *dot = strrchr(name, '.');
   if (!dot) return 0;
-  return !_stricmp(dot, ".txt") || !_stricmp(dot, ".chi") || !_stricmp(dot, ".chs") || !_stricmp(dot, ".md");
+  return    !_stricmp(dot, ".txt") ||
+            !_stricmp(dot, ".md")  ||
+            !_stricmp(dot, ".chi") ||
+            !_stricmp(dot, ".chs")
+  ;
 }
 
 /* Copy an ANSI string to the clipboard as CF_TEXT. Returns 0 on success,
