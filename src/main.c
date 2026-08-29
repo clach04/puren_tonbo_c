@@ -552,6 +552,12 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPara
   }
 
   case WM_COMMAND:
+    /* Only menu/accelerator commands here (lParam == 0). Control
+     * notifications (EN_*, etc.) carry the control HWND in lParam and
+     * their control IDs collide with IDM_* values (e.g. ID_EDITOR 2002
+     * vs IDM_OPEN_ASSOC 2002), so they must not reach the switch. */
+    if (lParam != 0)
+      return 0;
     if (LOWORD(wParam) == ID_SEARCH && HIWORD(wParam) == EN_CHANGE) {
       char buf[256];
       GetWindowTextA(g_hSearch, buf, sizeof(buf));
@@ -852,7 +858,12 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPara
           /* pt is already screen coordinates from GetMessagePos() -
            * converting again via ClientToScreen offsets the menu by
            * the tree's origin, so it appears away from the cursor. */
+          /* SetForegroundWindow is required (KB135788): without it the
+           * click that dismisses the menu falls through to the window
+           * underneath and can trigger an unintended action. */
+          SetForegroundWindow(hWnd);
           TrackPopupMenu(hPopup, TPM_LEFTBUTTON | TPM_RIGHTBUTTON, pt.x, pt.y, 0, hWnd, NULL);
+          PostMessage(hWnd, WM_NULL, 0, 0);
           SetFocus(g_hTree);
         }
         DestroyMenu(hPopup);
