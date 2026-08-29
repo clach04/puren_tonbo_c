@@ -803,9 +803,10 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPara
           }
         }
         {
-          POINT scpt = pt;
-          ClientToScreen(g_hTree, &scpt);
-          TrackPopupMenu(hPopup, TPM_LEFTBUTTON, scpt.x, scpt.y, 0, hWnd, NULL);
+          /* pt is already screen coordinates from GetMessagePos() -
+           * converting again via ClientToScreen offsets the menu by
+           * the tree's origin, so it appears away from the cursor. */
+          TrackPopupMenu(hPopup, TPM_LEFTBUTTON | TPM_RIGHTBUTTON, pt.x, pt.y, 0, hWnd, NULL);
           SetFocus(g_hTree);
         }
         DestroyMenu(hPopup);
