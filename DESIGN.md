@@ -165,9 +165,9 @@ Character encoding conversion module using Win32 APIs:
 
 Right-click on tree items opens a context menu with type-appropriate actions:
 
-  * **Directories**: "Open Directory" (opens in File Explorer via `ShellExecute("explore",...)`), "New Folder" (creates auto-named directory + in-place label editing)
-  * **Text files (.txt, .md)**: "Open" (opens with default file association), "Encrypt" (reads file, encrypts to .chi, deletes original via safe_save)
-  * **Encrypted files (.chi, .chs)**: "Open" (opens with default file association), "Decrypt" (reads file, decrypts to .txt, deletes original via safe_save)
+  * **Directories**: "Open Directory" (opens in File Explorer via `ShellExecute("explore",...)`), "Copy Full Name to Clipboard", "New Folder" (creates auto-named directory + in-place label editing)
+  * **Text files (.txt, .md)**: "Open" (opens with default file association), "Open Directory" (explores the file's containing directory), "Copy Full Name to Clipboard", "Encrypt" (reads file, encrypts to .chi, deletes original via safe_save)
+  * **Encrypted files (.chi, .chs)**: "Open" (opens with default file association), "Open Directory", "Copy Full Name to Clipboard", "Decrypt" (reads file, decrypts to .txt, deletes original via safe_save)
   * **Empty tree area**: "New Folder" (creates at current root directory level)
 
 Encrypt/Decrypt from context menu:
@@ -179,7 +179,9 @@ Encrypt/Decrypt from context menu:
 ### Implementation notes
 
   * `NM_RCLICK` notification triggers the popup; `TVM_HITTEST` selects the item under cursor. `GetMessagePos()` returns *screen* coordinates: a client-space copy is used for the hit-test, and the original point is passed directly to `TrackPopupMenu` (converting it again via `ClientToScreen` offsets the menu by the tree's screen origin).
-  * Command IDs `IDM_OPEN_DIR`, `IDM_OPEN_ASSOC`, `IDM_NEW_FOLDER`, `IDM_ENCRYPT_FILE`, `IDM_DECRYPT_FILE` in WM_COMMAND
+  * Command IDs `IDM_OPEN_DIR`, `IDM_OPEN_ASSOC`, `IDM_NEW_FOLDER`, `IDM_ENCRYPT_FILE`, `IDM_DECRYPT_FILE`, `IDM_COPY_PATH` in WM_COMMAND
+  * `IDM_OPEN_DIR` resolves a file path to its containing directory before `ShellExecute("explore",...)` (the explore verb fails on files)
+  * `IDM_COPY_PATH` copies the item's full ANSI path to the clipboard as CF_TEXT via `CopyTextToClipboard()`; shows a MessageBox on failure
   * `g_rightClickPath` + `g_rightClickItem` globals carry context from NM_RCLICK to WM_COMMAND
   * Tree uses `TVS_EDITLABELS` for in-place label editing (F2); `TVN_BEGINLABELEDITW` blocks root edit; `TVN_ENDLABELEDITW` renames on disk via `MoveFile` and updates `lParam`
   * Directories now store their full path in `lParam` (via `_strdup(childPath)`), matching the existing file lParam pattern

@@ -62,6 +62,7 @@
 #define IDM_ENCRYPT_FILE 2004
 #define IDM_DECRYPT_FILE 2005
 #define IDM_RENAME       2006
+#define IDM_COPY_PATH    2007
 #define WM_START_LABEL_EDIT (WM_APP + 1)
 #define WM_CLI_OPEN (WM_APP + 2)
 
@@ -163,6 +164,27 @@ static int is_note_ext(const char *name) {
   const char *dot = strrchr(name, '.');
   if (!dot) return 0;
   return !_stricmp(dot, ".txt") || !_stricmp(dot, ".chi") || !_stricmp(dot, ".chs") || !_stricmp(dot, ".md");
+}
+
+/* Copy an ANSI string to the clipboard as CF_TEXT. Returns 0 on success,
+ * -1 if the clipboard could not be opened, -2 on alloc failure, -3 if
+ * SetClipboardData failed. */
+static int CopyTextToClipboard(HWND hWnd, const char *text) {
+  HGLOBAL hMem;
+  size_t len = strlen(text) + 1;
+  if (!OpenClipboard(hWnd)) return -1;
+  hMem = GlobalAlloc(GMEM_MOVEABLE, len);
+  if (!hMem) { CloseClipboard(); return -2; }
+  memcpy(GlobalLock(hMem), text, len);
+  GlobalUnlock(hMem);
+  EmptyClipboard();
+  if (!SetClipboardData(CF_TEXT, hMem)) {
+    GlobalFree(hMem);
+    CloseClipboard();
+    return -3;
+  }
+  CloseClipboard();
+  return 0;
 }
 
 /* Parse command line: single optional positional argument, either a
@@ -700,10 +722,29 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPara
       MessageBox(hWnd, "Puren Tonbo C - Plain text editor with encryption",
         "About Puren Tonbo C", MB_OK | MB_ICONINFORMATION);
       break;
-    case IDM_OPEN_DIR:
-      if (g_rightClickPath[0])
-        ShellExecuteA(hWnd, "explore", g_rightClickPath, NULL, NULL, SW_SHOW);
+    case IDM_OPEN_DIR: {
+      char dirPath[MAX_PATH];
+      DWORD attrs;
+      if (!g_rightClickPath[0]) break;
+      strncpy(dirPath, g_rightClickPath, MAX_PATH - 1);
+      dirPath[MAX_PATH - 1] = '\0';
+      attrs = GetFileAttributesA(dirPath);
+      if (attrs != INVALID_FILE_ATTRIBUTES && !(attrs & FILE_ATTRIBUTE_DIRECTORY)) {
+        /* file: explore its containing directory instead */
+        char *slash = strrchr(dirPath, '\\');
+        if (slash) *slash = '\0';
+      }
+      ShellExecuteA(hWnd, "explore", dirPath, NULL, NULL, SW_SHOW);
       break;
+    }
+    case IDM_COPY_PATH: {
+      if (g_rightClickPath[0]) {
+        int rc = CopyTextToClipboard(hWnd, g_rightClickPath);
+        if (rc != 0)
+          MessageBoxA(hWnd, "Failed to copy path to clipboard", "Copy Full Name", MB_ICONERROR);
+      }
+      break;
+    }
     case IDM_OPEN_ASSOC:
       if (g_rightClickPath[0])
         ShellExecuteA(hWnd, "open", g_rightClickPath, NULL, NULL, SW_SHOW);
@@ -788,6 +829,10 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPara
             AppendMenuA(hPopup, MF_STRING, IDM_OPEN_ASSOC, "Open");
           else if (g_rightClickPath[0])
             AppendMenuA(hPopup, MF_STRING, IDM_OPEN_DIR, "Open Directory");
+          if (isFile && g_rightClickPath[0])
+            AppendMenuA(hPopup, MF_STRING, IDM_OPEN_DIR, "Open Directory");
+          if (g_rightClickPath[0])
+            AppendMenuA(hPopup, MF_STRING, IDM_COPY_PATH, "Copy Full Name to Clipboard");
           AppendMenuA(hPopup, MF_STRING, IDM_RENAME, "Rename");
           AppendMenuA(hPopup, MF_SEPARATOR, 0, NULL);
         }
