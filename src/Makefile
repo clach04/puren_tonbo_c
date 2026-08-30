@@ -5,6 +5,10 @@ CHI_C = chi_c/src
 CFLAGS = -Wno-attributes -std=c99 -I$(CHI_C)/ -I$(CHI_C)/openssh_shim -I$(CHI_C)/openssh-portable -I$(CHI_C)/openssh-portable/openbsd-compat
 # If feeling spicy...
 #CFLAGS += -Wall -Wextra
+
+# Debug option for right-click **Encrypt** / **Decrypt** to preserve the original file as `<filename>.<ext>.bak`. This is *not secure* (plaintext remains on disk) but aids in debugging.
+#CFLAGS += -DDEBUG_PRESERVE_OLD_FILES
+
 LDFLAGS = -lgdi32 -lcomctl32 -lcomdlg32 -lshell32
 
 

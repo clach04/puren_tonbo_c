@@ -130,4 +130,4 @@ See individual source files for licensing.
 
 ## Known Issues
 
-  * Right-click **Encrypt** / **Decrypt** preserves the original file as `<filename>.<ext>.bak`. This is *not secure* (plaintext remains on disk) but prevents accidental data loss during this early proof-of-concept stage.
+  * Encryption format based on Blowfish and NOT recommended

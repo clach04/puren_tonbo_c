@@ -2008,12 +2008,16 @@ static void EncryptFileToDisk(const char *path) {
   }
   free(cipher);
 
+#ifndef DEBUG_PRESERVE_OLD_FILES
   {
     char bakPath[MAX_PATH];
     snprintf(bakPath, MAX_PATH, "%s.bak", path);
     DeleteFileA(bakPath);
     MoveFileA(path, bakPath);
   }
+#else
+  DeleteFileA(path);
+#endif // DEBUG_PRESERVE_OLD_FILES
 
   if (_stricmp(path, g_curFile) == 0) {
     g_curFile[0] = '\0';
@@ -2101,12 +2105,16 @@ static void DecryptFileToDisk(const char *path) {
   }
   free(plain);
 
+#ifndef DEBUG_PRESERVE_OLD_FILES
   {
     char bakPath[MAX_PATH];
     snprintf(bakPath, MAX_PATH, "%s.bak", path);
     DeleteFileA(bakPath);
     MoveFileA(path, bakPath);
   }
+#else
+  DeleteFileA(path);
+#endif // DEBUG_PRESERVE_OLD_FILES
 
   if (_stricmp(path, g_curFile) == 0) {
     g_curFile[0] = '\0';
