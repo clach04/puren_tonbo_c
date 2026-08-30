@@ -17,7 +17,7 @@ TARGET = tonbo.exe
 $(TARGET): $(SRCS) $(RES_OBJS)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
-tonbo_res.o: tonbo.rc puren_tonbo_red_icon_32x32.ico
+tonbo_res.o: tonbo.rc version.h puren_tonbo_red_icon_32x32.ico
 	windres -O coff -o $@ tonbo.rc
 
 clean:
