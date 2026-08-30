@@ -94,10 +94,14 @@ encoding_list=utf8,cp1252
 word_wrap=0
 
 [external]
-name_1=Notepad++
-exe_1=C:\Program Files\Notepad++\notepad++.exe
-name_2=VS Code
-exe_2=code
+name_1=Scite
+exe_1=scite
+name_2=gvim
+exe_2=gvim
+name_3=Notepad++
+exe_3=C:\Program Files\Notepad++\notepad++.exe
+name_4=VS Code
+exe_4=code
 ```
 
   * `safe_save` - Write to temp file first, then rename. Default: 1 (on)
