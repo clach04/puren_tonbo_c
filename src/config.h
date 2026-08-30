@@ -6,6 +6,8 @@
 
 #define CFG_PATH "tonbo.ini"
 
+#define EXT_EDITORS 9
+
 typedef struct {
   int win_x, win_y, win_w, win_h;
   int tree_w;
@@ -19,6 +21,8 @@ typedef struct {
   int fuzzy_search;
   int encoding_count;
   UINT encoding_cps[MAX_ENCODINGS];
+  char ext_name[EXT_EDITORS][64];   /* [external] name_1..name_9 */
+  char ext_exe[EXT_EDITORS][260];   /* [external] exe_1..exe_9 */
 } AppConfig;
 
 void config_load(AppConfig *cfg, const char *path);

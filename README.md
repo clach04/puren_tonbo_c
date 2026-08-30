@@ -92,6 +92,12 @@ encoding_list=utf8,cp1252
 
 [word]
 word_wrap=0
+
+[external]
+name_1=Notepad++
+exe_1=C:\Program Files\Notepad++\notepad++.exe
+name_2=VS Code
+exe_2=code
 ```
 
   * `safe_save` - Write to temp file first, then rename. Default: 1 (on)
@@ -100,6 +106,8 @@ word_wrap=0
   * `persist_window` - Save and restore window position/size across sessions. 0 = always open at default size/position. Default: 1
   * `sort_dirs_first` - Show directories at the top of the tree view. Default: 1
   * `encoding_list` - Comma-separated list of character encodings to try when opening files. First encoding used for saving. BOM detection tried before the list. Default: `utf8`
+
+  * `[external]` section - Optional external editors, up to 9 (`name_1`/`exe_1` through `name_9`/`exe_9`; sparse numbering allowed). Each fully-specified entry (both name and exe) appears in the right-click menu for files. The file is passed as the program's sole argument; working directory is the file's folder. Entries are preserved when the app rewrites the ini.
 
 ## Third-party code and licenses
 

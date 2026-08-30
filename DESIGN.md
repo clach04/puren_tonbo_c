@@ -158,7 +158,6 @@ Character encoding conversion module using Win32 APIs:
   * working find/search support
   * Icon support (tree has placeholder image indices 0/1 but no actual image list)
   * add a view-only mode, to prevent accidental editing and/or deleting
-  * support external editor support, under config
   * support templates/snippets, e.g. today's date, time, timestamp, and static text in config file
 
 ## Right-Click Context Menu
@@ -166,9 +165,16 @@ Character encoding conversion module using Win32 APIs:
 Right-click on tree items opens a context menu with type-appropriate actions:
 
   * **Directories**: "Open Directory" (opens in File Explorer via `ShellExecute("explore",...)`), "Copy Full Name to Clipboard", "New Folder" (creates auto-named directory + in-place label editing)
-  * **Text files (.txt, .md)**: "Open" (opens with default file association), "Open Directory" (explores the file's containing directory), "Copy Full Name to Clipboard", "Encrypt" (reads file, encrypts to .chi, deletes original via safe_save)
-  * **Encrypted files (.chi, .chs)**: "Open" (opens with default file association), "Open Directory", "Copy Full Name to Clipboard", "Decrypt" (reads file, decrypts to .txt, deletes original via safe_save)
+  * **Text files (.txt, .md)**: "Open" (opens with default file association), "Open Directory" (explores the file's containing directory), "Copy Full Name to Clipboard", external editors (see below), "Encrypt" (reads file, encrypts to .chi, deletes original via safe_save)
+  * **Encrypted files (.chi, .chs)**: "Open" (opens with default file association), "Open Directory", "Copy Full Name to Clipboard", external editors (see below), "Decrypt" (reads file, decrypts to .txt, deletes original via safe_save)
   * **Empty tree area**: "New Folder" (creates at current root directory level)
+
+External editors from context menu:
+
+  * Configured in `tonbo.ini` under `[external]`: `name_1`..`name_9` / `exe_1`..`exe_9`, sparse numbering allowed; an entry needs both name and exe to appear
+  * Files only (including encrypted .chi/.chs; what the editor shows is the user's business)
+  * Launch: `ShellExecute("open", exe, file, ...)` with the file's directory as working directory; file passed as sole argument
+  * Layout: 1 editor = flat "Open with <name>"; 2 = flat "&<n> <name>" items; 3+ = "Open With" submenu. Digits 1-9 are menu mnemonics while the menu is open (decided against global shortcuts)
 
 Encrypt/Decrypt from context menu:
   * Operates on the on-disk file, independent of the editor
@@ -182,6 +188,7 @@ Encrypt/Decrypt from context menu:
   * Command IDs `IDM_OPEN_DIR`, `IDM_OPEN_ASSOC`, `IDM_NEW_FOLDER`, `IDM_ENCRYPT_FILE`, `IDM_DECRYPT_FILE`, `IDM_COPY_PATH` in WM_COMMAND
   * `IDM_OPEN_DIR` resolves a file path to its containing directory before `ShellExecute("explore",...)` (the explore verb fails on files)
   * `IDM_COPY_PATH` copies the item's full ANSI path to the clipboard as CF_TEXT via `CopyTextToClipboard()`; shows a MessageBox on failure
+  * `IDM_EXT_1`..`IDM_EXT_9` launch external editors from `g_cfg.ext_name/ext_exe`; menu layout (flat vs "Open With" submenu) depends on how many entries are configured
   * `g_rightClickPath` + `g_rightClickItem` globals carry context from NM_RCLICK to WM_COMMAND
   * Tree uses `TVS_EDITLABELS` for in-place label editing (F2); `TVN_BEGINLABELEDITW` blocks root edit; `TVN_ENDLABELEDITW` renames on disk via `MoveFile` and updates `lParam`
   * Directories now store their full path in `lParam` (via `_strdup(childPath)`), matching the existing file lParam pattern

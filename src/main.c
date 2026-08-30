@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <assert.h>
 
 #include "config.h"
 #include "encoding.h"
@@ -78,7 +79,17 @@ enum {
   IDM_ENCRYPT_FILE,
   IDM_DECRYPT_FILE,
   IDM_RENAME,
-  IDM_COPY_PATH
+  IDM_COPY_PATH,
+  /* external editors, index 0-8 -> IDM_EXT_1..IDM_EXT_9 */
+  IDM_EXT_1,
+  IDM_EXT_2,
+  IDM_EXT_3,
+  IDM_EXT_4,
+  IDM_EXT_5,
+  IDM_EXT_6,
+  IDM_EXT_7,
+  IDM_EXT_8,
+  IDM_EXT_9
 };
 
 #define WM_START_LABEL_EDIT (WM_APP + 1)
@@ -774,6 +785,25 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPara
       }
       break;
     }
+    case IDM_EXT_1: case IDM_EXT_2: case IDM_EXT_3:
+    case IDM_EXT_4: case IDM_EXT_5: case IDM_EXT_6:
+    case IDM_EXT_7: case IDM_EXT_8: case IDM_EXT_9: {
+      int i = LOWORD(wParam) - IDM_EXT_1;
+      char dirPath[MAX_PATH];
+      char *slash;
+      HINSTANCE h;
+      assert(g_cfg.ext_exe[i][0]);
+      strncpy(dirPath, g_rightClickPath, MAX_PATH - 1);
+      dirPath[MAX_PATH - 1] = '\0';
+      slash = strrchr(dirPath, '\\');
+      if (slash) *slash = '\0';           /* working dir = file's directory */
+      h = ShellExecuteA(hWnd, "open", g_cfg.ext_exe[i], g_rightClickPath,
+                        dirPath, SW_SHOW);
+      if ((INT_PTR)h <= 32)
+        MessageBoxA(hWnd, "Failed to launch external editor",
+                    g_cfg.ext_name[i], MB_ICONERROR);
+      break;
+    }
     case IDM_OPEN_ASSOC:
       if (g_rightClickPath[0])
         ShellExecuteA(hWnd, "open", g_rightClickPath, NULL, NULL, SW_SHOW);
@@ -862,6 +892,29 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPara
             AppendMenuA(hPopup, MF_STRING, IDM_OPEN_DIR, "Open Directory");
           if (g_rightClickPath[0])
             AppendMenuA(hPopup, MF_STRING, IDM_COPY_PATH, "Copy Full Name to Clipboard");
+          /* External editors: files only.
+           * 1 editor: flat item; 2: flat items; 3+: "Open With" submenu.
+           * Digits 1-9 act as menu mnemonics while the menu is open. */
+          if (isFile && g_rightClickPath[0]) {
+            int i, n = 0, idx[EXT_EDITORS];
+            for (i = 0; i < EXT_EDITORS; i++)
+              if (g_cfg.ext_name[i][0] && g_cfg.ext_exe[i][0])
+                idx[n++] = i;
+            if (n == 1) {
+              char label[128];
+              sprintf(label, "Open with %s", g_cfg.ext_name[idx[0]]);
+              AppendMenuA(hPopup, MF_STRING, IDM_EXT_1 + idx[0], label);
+            } else if (n > 1) {
+              HMENU hSub = (n > 2) ? CreatePopupMenu() : hPopup;
+              for (i = 0; i < n; i++) {
+                char label[128];
+                sprintf(label, "&%d %s", idx[i] + 1, g_cfg.ext_name[idx[i]]);
+                AppendMenuA(hSub, MF_STRING, IDM_EXT_1 + idx[i], label);
+              }
+              if (n > 2)
+                AppendMenuA(hPopup, MF_POPUP, (UINT_PTR)hSub, "Open With");
+            }
+          }
           AppendMenuA(hPopup, MF_SEPARATOR, 0, NULL);
           AppendMenuA(hPopup, MF_STRING, IDM_RENAME, "Rename");
           AppendMenuA(hPopup, MF_SEPARATOR, 0, NULL);
