@@ -10,6 +10,7 @@
 #include <assert.h>
 
 #include "config.h"
+#include "version.h"
 #include "encoding.h"
 #include "bf01_file.h"
 #include "fts_fuzzy_match.h"
@@ -762,8 +763,10 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPara
       UpdateStatus();
       break;
     case IDM_ABOUT:
-      MessageBox(hWnd, "Puren Tonbo C - Plain text editor with encryption",
-        "About Puren Tonbo C", MB_OK | MB_ICONINFORMATION);
+      MessageBox(hWnd,
+        "Puren Tonbo " TONBO_VERSION_STRING "\n"
+        "Plain text editor with encryption",
+        "About Puren Tonbo", MB_OK | MB_ICONINFORMATION);
       break;
     case IDM_OPEN_DIR: {
       char dirPath[MAX_PATH];
