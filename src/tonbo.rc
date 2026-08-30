@@ -1,0 +1,4 @@
+// TODO: add VERSIONINFO block (FileDescription, ProductName, FileVersion,
+// ProductVersion) in a future session; share version via version.h with the
+// About dialog code.
+1 ICON "puren_tonbo_red_icon_32x32.ico"

@@ -286,6 +286,9 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrev, LPSTR cmdLine, int nShow) {
   wc.lpfnWndProc = WndProc;
   wc.hInstance = hInst;
   wc.hCursor = LoadCursor(NULL, IDC_ARROW);
+  /* TODO: multi-size .ico (16/32/48/256) so small sizes are not scaled */
+  wc.hIcon = LoadIconA(hInst, MAKEINTRESOURCEA(1));
+  wc.hIconSm = wc.hIcon;
   wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
   wc.lpszClassName = "PurenTonboClass";
   RegisterClassEx(&wc);
