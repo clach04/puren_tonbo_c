@@ -21,8 +21,8 @@ typedef struct {
   int fuzzy_search;
   int encoding_count;
   UINT encoding_cps[MAX_ENCODINGS];
-  char ext_name[EXT_EDITORS][64];   /* [external] name_1..name_9 */
-  char ext_exe[EXT_EDITORS][260];   /* [external] exe_1..exe_9 */
+  char ext_name[EXT_EDITORS][64+1];   /* [external] name_1..name_9 */
+  char ext_exe[EXT_EDITORS][260];   /* [external] exe_1..exe_9 MAX_PATH */
 } AppConfig;
 
 void config_load(AppConfig *cfg, const char *path);
