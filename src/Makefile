@@ -21,7 +21,8 @@ TARGET = tonbo.exe
 $(TARGET): $(SRCS) $(RES_OBJS)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
-tonbo_res.o: tonbo.rc version.h puren_tonbo_red_icon_32x32.ico
+# red_icon_all_4colors.ico - converted from https://mytoolstudio.com/tools/image/image-to-ico-converter/ 16x16, 32x32, 48x48, 64x64, 128x128, 256x256
+tonbo_res.o: tonbo.rc version.h red_icon_all_4colors.ico
 	windres -O coff -o $@ tonbo.rc
 
 clean:

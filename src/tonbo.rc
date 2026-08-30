@@ -1,7 +1,7 @@
 #include <winver.h>
 #include "version.h"
 
-1 ICON "puren_tonbo_red_icon_32x32.ico"
+1 ICON "red_icon_all_4colors.ico"
 
 1 VERSIONINFO
 FILEVERSION     TONBO_VERSION_MAJOR, TONBO_VERSION_MINOR, TONBO_VERSION_PATCH, 0
