@@ -69,6 +69,8 @@ static void defaults(AppConfig *cfg) {
   cfg->encoding_cps[0] = CP_UTF8;
 }
 
+static void capture_crypto_raw(const char *path, char *dst, size_t dstsz);
+
 void config_load(AppConfig *cfg, const char *path) {
   ini_t *ini;
   const char *v;
@@ -101,6 +103,29 @@ void config_load(AppConfig *cfg, const char *path) {
       if (v) { strncpy(cfg->ext_exe[i], v, sizeof(cfg->ext_exe[i]) - 1); cfg->ext_exe[i][sizeof(cfg->ext_exe[i]) - 1] = '\0'; }
     }
   }
+  {
+    const char *sec = NULL;
+    while ((sec = ini_next_section(ini, sec)) != NULL) {
+      const char *pfx = "crypto.";
+      size_t plen = strlen(pfx);
+      if (_strnicmp(sec, pfx, plen) != 0) continue;
+      if (cfg->crypto_count >= CRYPTO_TOOLS) break; /* too many; ignore extras */
+      {
+        CryptoTool *ct = &cfg->crypto[cfg->crypto_count];
+        memset(ct, 0, sizeof(*ct));
+        strncpy(ct->name, sec + plen, sizeof(ct->name) - 1);
+        v = ini_get(ini, sec, "extensions");
+        if (v) { strncpy(ct->extensions, v, sizeof(ct->extensions) - 1); ct->extensions[sizeof(ct->extensions) - 1] = '\0'; }
+        v = ini_get(ini, sec, "password_env");
+        if (v) { strncpy(ct->password_env, v, sizeof(ct->password_env) - 1); ct->password_env[sizeof(ct->password_env) - 1] = '\0'; }
+        v = ini_get(ini, sec, "decrypt_cmd");
+        if (v) { strncpy(ct->decrypt_cmd, v, sizeof(ct->decrypt_cmd) - 1); ct->decrypt_cmd[sizeof(ct->decrypt_cmd) - 1] = '\0'; }
+        v = ini_get(ini, sec, "encrypt_cmd");
+        if (v) { strncpy(ct->encrypt_cmd, v, sizeof(ct->encrypt_cmd) - 1); ct->encrypt_cmd[sizeof(ct->encrypt_cmd) - 1] = '\0'; }
+        cfg->crypto_count++;
+      }
+    }
+  }
   if (!cfg->persist_window) { cfg->win_x = 100; cfg->win_y = 100; cfg->win_w = 800; cfg->win_h = 600; }
   v = ini_get(ini, "general", "encoding_list");
   if (v) {
@@ -118,6 +143,35 @@ void config_load(AppConfig *cfg, const char *path) {
     if (n > 0) cfg->encoding_count = n;
   }
   ini_free(ini);
+  capture_crypto_raw(path, cfg->crypto_raw, sizeof(cfg->crypto_raw));
+}
+
+/* Copy all [crypto.*] sections verbatim (normalized to \n) so config_save
+ * can round-trip sections it does not otherwise understand. */
+static void capture_crypto_raw(const char *path, char *dst, size_t dstsz) {
+  FILE *f = fopen(path, "r");
+  char line[1024];
+  int in_crypto = 0;
+  size_t used = 0;
+  if (!f) return;
+  dst[0] = '\0';
+  while (fgets(line, sizeof(line), f)) {
+    const char *pfx = "[crypto.";
+    if (line[0] == '[')
+      in_crypto = (_strnicmp(line, pfx, strlen(pfx)) == 0);
+    if (!in_crypto) continue;
+    {
+      size_t len = strlen(line);
+      /* strip \r\n, re-add \n */
+      while (len > 0 && (line[len-1] == '\n' || line[len-1] == '\r')) len--;
+      if (used + len + 2 >= dstsz) break; /* overflow guard: drop remainder */
+      memcpy(dst + used, line, len);
+      used += len;
+      dst[used++] = '\n';
+    }
+  }
+  dst[used] = '\0';
+  fclose(f);
 }
 
 void config_save(const AppConfig *cfg, const char *path) {
@@ -135,6 +189,7 @@ void config_save(const AppConfig *cfg, const char *path) {
       }
     }
   }
+  if (cfg->crypto_raw[0]) fputs(cfg->crypto_raw, f);
   fclose(f);
 }
 
@@ -152,5 +207,6 @@ int config_equal(const AppConfig *a, const AppConfig *b) {
     && a->fuzzy_search == b->fuzzy_search
     && a->encoding_count == b->encoding_count
     && memcmp(a->ext_name, b->ext_name, sizeof(a->ext_name)) == 0
-    && memcmp(a->ext_exe, b->ext_exe, sizeof(a->ext_exe)) == 0;
+    && memcmp(a->ext_exe, b->ext_exe, sizeof(a->ext_exe)) == 0
+    && strcmp(a->crypto_raw, b->crypto_raw) == 0;
 }

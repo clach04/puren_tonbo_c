@@ -13,6 +13,7 @@
 #include "version.h"
 #include "encoding.h"
 #include "bf01_file.h"
+#include "crypto.h"
 #include "fts_fuzzy_match.h"
 
 #define FILTER_DEBOUNCE_MS 250
@@ -196,8 +197,48 @@ static int is_note_ext(const char *name) {
   return    !_stricmp(dot, ".txt") ||
             !_stricmp(dot, ".md")  ||
             !_stricmp(dot, ".chi") ||
-            !_stricmp(dot, ".chs")
+            !_stricmp(dot, ".chs") ||
+            crypto_is_tool_ext(&g_cfg, name)
   ;
+}
+
+/* Build a double-NUL terminated file dialog filter: built-in types plus a
+ * combined group for any configured external crypto extensions. */
+static void BuildFileDialogFilter(char *buf, size_t bufsz) {
+  size_t o = 0;
+  const char *parts[] = {
+    "Text Files (*.txt;*.md)", "*.txt;*.md",
+    "Encrypted (*.chi;*.chs)", "*.chi;*.chs",
+  };
+  size_t i;
+  for (i = 0; i < sizeof(parts)/sizeof(parts[0]); i++) {
+    size_t len = strlen(parts[i]) + 1;
+    if (o + len + 1 >= bufsz) return;
+    memcpy(buf + o, parts[i], len);
+    o += len;
+  }
+  if (g_cfg.crypto_count > 0) {
+    size_t j;
+    char exts[256];
+    exts[0] = '\0';
+    for (j = 0; j < g_cfg.crypto_count; j++) {
+      if (exts[0]) strncat(exts, " ", sizeof(exts) - strlen(exts) - 1);
+      strncat(exts, g_cfg.crypto[j].extensions, sizeof(exts) - strlen(exts) - 1);
+    }
+    if (exts[0]) {
+      const char *label = "Encrypted (external)";
+      size_t len = strlen(label) + 1 + strlen(exts) + 1;
+      if (o + len + 1 < bufsz) {
+        memcpy(buf + o, label, strlen(label) + 1);
+        o += strlen(label) + 1;
+        memcpy(buf + o, exts, strlen(exts) + 1);
+        o += strlen(exts) + 1;
+      }
+    }
+  }
+  memcpy(buf + o, "All Files (*.*)", 16); o += 16;
+  memcpy(buf + o, "*.*", 4); o += 4;
+  buf[o] = '\0'; buf[o + 1] = '\0'; /* double NUL terminator */
 }
 
 /* Copy an ANSI string to the clipboard as CF_TEXT. Returns 0 on success,
@@ -661,10 +702,12 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPara
     case IDM_OPEN: {
       OPENFILENAME ofn;
       char file[MAX_PATH] = "";
+      char filter[1024];
       ZeroMemory(&ofn, sizeof(ofn));
       ofn.lStructSize = sizeof(ofn);
       ofn.hwndOwner = hWnd;
-      ofn.lpstrFilter = "Text Files (*.txt;*.md)\0*.txt;*.md\0Encrypted (*.chi;*.chs)\0*.chi;*.chs\0All Files (*.*)\0*.*\0";
+      BuildFileDialogFilter(filter, sizeof(filter));
+      ofn.lpstrFilter = filter;
       ofn.lpstrFile = file;
       ofn.nMaxFile = MAX_PATH;
       ofn.lpstrInitialDir = g_curDir[0] ? g_curDir : NULL;
@@ -1723,7 +1766,32 @@ static void SelectTreeItemByPath(const char *path) {
 
 static void BF01OpenFile(const char *path) {
   SelectTreeItemByPath(path);
-  if (is_chi_file(path)) {
+  {
+    /* External encryption binary (or tool) file: child decrypts to stdout,
+     * tonbo reads plain text via pipe. */
+    const CryptoTool *ct = crypto_tool_for_path(&g_cfg, path);
+    if (ct) {
+      char pass[256] = "";
+      char err[1024] = "";
+      char *plain = NULL;
+      size_t plainlen = 0;
+
+      if (!AskPassword(pass, sizeof(pass), 0)) {
+        SetFocus(g_hTree);
+        return;
+      }
+
+      if (crypto_decrypt_file(ct, path, pass, &plain, &plainlen, err, sizeof(err))) {
+        MessageBox(g_hWnd, err, "Decryption failed", MB_OK | MB_ICONERROR);
+        SetFocus(g_hTree);
+        return;
+      }
+      PasswordCache_Set(pass);
+      PasswordCache_ResetTimer();
+      BF01OpenFileRaw((unsigned char *)plain, (long)plainlen);
+      free(plain);
+    }
+    else if (is_chi_file(path)) {
     char pass[256] = "";
     FILE *fin;
     unsigned char *filedata;
@@ -1789,6 +1857,7 @@ static void BF01OpenFile(const char *path) {
   UpdateMenuSaveState(g_hWnd);
   UpdateTitle();
   UpdateStatus();
+  }
 }
 
 static void SaveCurrentFile(void) {
@@ -1809,6 +1878,37 @@ static void SaveCurrentFile(void) {
     return;
   }
   free(wbuf);
+
+  {
+    /* External encryption binary (or tool): tonbo writes plain text to the
+     * child's stdin, child writes the encrypted output file itself. */
+    const CryptoTool *ct = crypto_tool_for_path(&g_cfg, g_curFile);
+    if (ct) {
+      char pass[256] = "";
+      char err[1024] = "";
+      if (!AskPassword(pass, sizeof(pass), 1)) {
+        free(bytes);
+        return;
+      }
+      /* TODO add support for safe save with command line tools that support that */
+  /* NOTE: encrypt path not yet verified end-to-end (child did not exit in
+   * smoke test); decrypt is the supported path for now. */
+      if (crypto_encrypt_file(ct, g_curFile, bytes, (size_t)blen, pass, err, sizeof(err))) {
+        free(bytes);
+        MessageBox(g_hWnd, err, "Encryption failed", MB_OK | MB_ICONERROR);
+        return;
+      }
+      PasswordCache_Set(pass);
+      PasswordCache_ResetTimer();
+      free(bytes);
+      g_dirty = FALSE;
+      SendMessage(g_hEditor, EM_SETMODIFY, FALSE, 0);
+      UpdateMenuSaveState(g_hWnd);
+      UpdateTitle();
+      RefreshTree();
+      return;
+    }
+  }
 
   if (is_chi_file(g_curFile)) {
     char pass[256] = "";
@@ -1936,13 +2036,15 @@ static void SaveCurrentFile(void) {
 static void SaveFileAs(void) {
   OPENFILENAME ofn;
   char file[MAX_PATH] = "";
+  char filter[1024];
   const char *dot;
   if (g_curFile[0]) strncpy(file, g_curFile, MAX_PATH - 1);
 
   ZeroMemory(&ofn, sizeof(ofn));
   ofn.lStructSize = sizeof(ofn);
   ofn.hwndOwner = g_hWnd;
-  ofn.lpstrFilter = "Text Files (*.txt)\0*.txt\0Encrypted (*.chi)\0*.chi\0All Files (*.*)\0*.*\0";
+  BuildFileDialogFilter(filter, sizeof(filter));
+  ofn.lpstrFilter = filter;
   ofn.lpstrFile = file;
   ofn.nMaxFile = MAX_PATH;
   ofn.lpstrInitialDir = g_curDir[0] ? g_curDir : NULL;
@@ -1950,7 +2052,8 @@ static void SaveFileAs(void) {
 
   if (GetSaveFileName(&ofn)) {
     dot = strrchr(file, '.');
-    if (!dot || (_stricmp(dot, ".txt") && _stricmp(dot, ".chi") && _stricmp(dot, ".chs") && _stricmp(dot, ".md")))
+    if (!dot || (_stricmp(dot, ".txt") && _stricmp(dot, ".chi") && _stricmp(dot, ".chs") && _stricmp(dot, ".md")
+                 && !crypto_is_tool_ext(&g_cfg, file)))
       strncat(file, ".txt", MAX_PATH - strlen(file) - 1);
     strncpy(g_curFile, file, MAX_PATH - 1);
     g_curFile[MAX_PATH - 1] = '\0';
@@ -1975,7 +2078,7 @@ static void EncryptFileToDisk(const char *path) {
   char pass[256];
   char chiPath[MAX_PATH];
 
-  if (is_chi_file(path)) return;
+  if (is_chi_file(path) || crypto_is_tool_ext(&g_cfg, path)) return;
 
   f = fopen(path, "rb");
   if (!f) { MessageBox(g_hWnd, "Cannot open file", "Error", MB_OK | MB_ICONERROR); return; }
@@ -2069,7 +2172,7 @@ static void DecryptFileToDisk(const char *path) {
   char pass[256];
   char txtPath[MAX_PATH];
 
-  if (!is_chi_file(path)) return;
+  if (!is_chi_file(path) || crypto_is_tool_ext(&g_cfg, path)) return;
 
   f = fopen(path, "rb");
   if (!f) { MessageBox(g_hWnd, "Cannot open file", "Error", MB_OK | MB_ICONERROR); return; }

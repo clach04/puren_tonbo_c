@@ -12,7 +12,7 @@ CFLAGS = -Wno-attributes -std=c99 -I$(CHI_C)/ -I$(CHI_C)/openssh_shim -I$(CHI_C)
 LDFLAGS = -lgdi32 -lcomctl32 -lcomdlg32 -lshell32
 
 
-SRCS = main.c config.c encoding.c ini.c fts_fuzzy_match.c $(CHI_C)/bf01_file.c $(CHI_C)/openssh-portable/openbsd-compat/blowfish.c $(CHI_C)/openssh-portable/openbsd-compat/md5.c
+SRCS = main.c config.c encoding.c crypto.c ini.c fts_fuzzy_match.c $(CHI_C)/bf01_file.c $(CHI_C)/openssh-portable/openbsd-compat/blowfish.c $(CHI_C)/openssh-portable/openbsd-compat/md5.c
 
 RES_OBJS = tonbo_res.o
 

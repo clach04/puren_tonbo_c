@@ -257,6 +257,24 @@ const char* ini_get(ini_t *ini, const char *section, const char *key) {
 }
 
 
+const char* ini_next_section(ini_t *ini, const char *prev) {
+  char *p = ini->data;
+  int found = (prev == NULL);
+  if (*p == '\0') {
+    p = next(ini, p);
+  }
+  while (p < ini->end) {
+    if (*p == '[') {
+      const char *name = p + 1;
+      if (found) return name;
+      if (!strcmpci(name, prev)) found = 1;
+    }
+    p = next(ini, p);
+  }
+  return NULL;
+}
+
+
 int ini_sget(
   ini_t *ini, const char *section, const char *key,
   const char *scanfmt, void *dst

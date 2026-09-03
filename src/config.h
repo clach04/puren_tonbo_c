@@ -7,6 +7,17 @@
 #define CFG_FILENAME "tonbo.ini"
 
 #define EXT_EDITORS 9
+#define CRYPTO_TOOLS 8
+
+/* External encryption binary (or tool) definition, from a [crypto.NAME]
+ * ini section. See crypto.h for usage. */
+typedef struct {
+  char name[64];          /* NAME from [crypto.NAME] */
+  char extensions[256];   /* space-separated extensions, each with leading dot */
+  char password_env[64];  /* env var name tonbo sets for the child (optional) */
+  char decrypt_cmd[1024]; /* command template; {FILENAME} = input file */
+  char encrypt_cmd[1024]; /* command template; {FILENAME} = output file */
+} CryptoTool;
 
 typedef struct {
   int win_x, win_y, win_w, win_h;
@@ -23,6 +34,9 @@ typedef struct {
   UINT encoding_cps[MAX_ENCODINGS];
   char ext_name[EXT_EDITORS][64+1];   /* [external] name_1..name_9 */
   char ext_exe[EXT_EDITORS][260];   /* [external] exe_1..exe_9 MAX_PATH */
+  int crypto_count;
+  CryptoTool crypto[CRYPTO_TOOLS];  /* from [crypto.*] sections */
+  char crypto_raw[8192];            /* verbatim [crypto.*] text, preserved on save */
 } AppConfig;
 
 /* Resolve config file path: --config <path>, or search current dir then

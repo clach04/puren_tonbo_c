@@ -16,5 +16,9 @@ ini_t*      ini_load(const char *filename);
 void        ini_free(ini_t *ini);
 const char* ini_get(ini_t *ini, const char *section, const char *key);
 int         ini_sget(ini_t *ini, const char *section, const char *key, const char *scanfmt, void *dst);
+/* Enumerate sections in file order. prev==NULL returns first section name,
+ * otherwise the name of the section following 'prev'. NULL when exhausted.
+ * Returned pointer valid until ini_free. */
+const char* ini_next_section(ini_t *ini, const char *prev);
 
 #endif

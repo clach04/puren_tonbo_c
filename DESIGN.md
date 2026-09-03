@@ -150,6 +150,41 @@ Character encoding conversion module using Win32 APIs:
   * The `hard_exit` parameter: 0 = return NULL on error (current usage), 1 = call exit()
   * Password: plain C string, null-terminated
 
+## External Encryption Binaries (or Tools)
+
+Support for encryption formats handled by external executables, configured in
+`tonbo.ini`. The external tool performs all reading/writing of the encrypted
+file; plain text is exchanged with tonbo over pipes (no plaintext on disk).
+
+### Configuration
+
+One `[crypto.NAME]` ini section per tool:
+
+  * `extensions` - space-separated filename extensions (each with leading dot); one tool may own several
+  * `password_env` - environment variable name; tonbo spawns the child with this variable set to the password from the GUI prompt. The password is never placed on the command line. The tool must support reading the password from that env var. If absent, the tool must not need a password
+  * `decrypt_cmd` - command template; `{FILENAME}` is the encrypted input file; tool writes plain text to stdout
+  * `encrypt_cmd` - command template; `{FILENAME}` is the encrypted output file; tonbo writes plain text to the tool's stdin and the tool writes the file itself
+
+Only the `{FILENAME}` placeholder exists; it is quoted by tonbo if the path
+contains spaces. Unknown `{...}` placeholders are rejected at command build
+time. Built-in bf01 (.chi/.chs) handling is unchanged; tools are purely
+additive.
+
+### Runtime behaviour
+
+  * Decrypt: `CreateProcess` with `CREATE_NO_WINDOW`; tonbo reads the child's stdout via pipe; stderr captured for the error MessageBox; non-zero exit code, empty output, or launch failure is a hard error (nothing opened). **Tested working** (good and bad password, password_env)
+  * Encrypt: tonbo writes the full plaintext buffer to the child's stdin (pipe), then verifies the output file exists and is non-empty after successful exit. **NOT YET VERIFIED**: smoke test showed the encrypt child never exiting; decrypt is the working path
+  * Password: always prompted via the existing GUI dialog (with the normal password cache); passed to the child only via `password_env`
+  * `safe_save` / `paranoid_save` are bypassed for external-tool files (the child owns the output file). Future: support for tools that handle temp-file semantics themselves
+  * External extensions appear in the tree, open/save dialog filters; Save As with a configured extension encrypts via that tool (unverified, see above)
+  * Right-click Encrypt/Decrypt (bf01 conversions) is disabled for external-tool files
+
+### Glossary
+
+  * **Crypto Tool** (aka external encryption binary or tool): An external executable configured in `tonbo.ini` under a `[crypto.NAME]` section that performs all reading and writing of encrypted files for one or more filename extensions. Plain text is exchanged with tonbo over pipes: decrypt = tool writes plain text to stdout; encrypt = tonbo writes plain text to the tool's stdin and the tool writes the encrypted output file itself. Tonbo never holds the ciphertext in memory and never puts the password on the command line.
+  * **Built-in crypto**: The compiled-in bf01 encryption used for `.chi` / `.chs` files (see "BF01 Encryption Format" above). Precedes and is unaffected by Crypto Tools; Crypto Tools are purely additive.
+  * **Extension binding**: The mapping from a filename extension to a Crypto Tool, defined by the `extensions` key of the tool's `[crypto.NAME]` section. One tool may own several extensions. Determines: tree visibility, open/save dialog filters, and which encrypt/decrypt command is used.
+
 ## TODO Items
 
   * Undo still shows file as modified, even though it is not changed
