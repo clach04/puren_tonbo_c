@@ -4,7 +4,7 @@
 #include "ini.h"
 #include "encoding.h"
 
-#define CFG_PATH "tonbo.ini"
+#define CFG_FILENAME "tonbo.ini"
 
 #define EXT_EDITORS 9
 
@@ -24,6 +24,13 @@ typedef struct {
   char ext_name[EXT_EDITORS][64+1];   /* [external] name_1..name_9 */
   char ext_exe[EXT_EDITORS][260];   /* [external] exe_1..exe_9 MAX_PATH */
 } AppConfig;
+
+/* Resolve config file path: --config <path>, or search current dir then
+   USERPROFILE for CFG_FILENAME.  Returns a static buffer (caller copies). */
+const char *config_resolve_path(const char *cli_path);
+
+/* Return the path currently used for saving config. */
+const char *config_get_save_path(void);
 
 void config_load(AppConfig *cfg, const char *path);
 void config_save(const AppConfig *cfg, const char *path);

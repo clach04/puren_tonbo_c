@@ -221,45 +221,65 @@ static int CopyTextToClipboard(HWND hWnd, const char *text) {
   return 0;
 }
 
-/* Parse command line: single optional positional argument, either a
- * directory (tree root) or a file (open in editor, tree rooted at its
- * parent directory). Uses wide command line for Unicode path support;
- * paths converted to the app's internal ANSI representation. */
-static void ParseCommandLineArgs(char *cliDir, int cliDirSize, char *cliFile, int cliFileSize) {
+/* Parse command line: supports --config <path>, plus single optional
+   positional argument which is either a directory (tree root) or a file
+   (open in editor, tree rooted at its parent directory).  Uses wide
+   command line for Unicode path support; paths converted to the app's
+   internal ANSI representation. */
+static void ParseCommandLineArgs(char *cliDir, int cliDirSize, char *cliFile,
+                                 int cliFileSize, char *cfgPath, int cfgSize) {
   int argc = 0;
   wchar_t **argvW;
 
   cliDir[0] = '\0';
   cliFile[0] = '\0';
+  cfgPath[0] = '\0';
 
   argvW = CommandLineToArgvW(GetCommandLineW(), &argc);
   if (!argvW) return;
-  if (argc > 1) {
-    char path[MAX_PATH];
-    DWORD attrs;
+  {
+    int i;
+    for (i = 1; i < argc; i++) {
+      char arg[MAX_PATH];
+      WideCharToMultiByte(CP_ACP, 0, argvW[i], -1, arg, sizeof(arg), NULL, NULL);
 
-    path[0] = '\0';
-    WideCharToMultiByte(CP_ACP, 0, argvW[1], -1, path, sizeof(path), NULL, NULL);
-    attrs = GetFileAttributes(path);
-    if (attrs == INVALID_FILE_ATTRIBUTES) {
-      MessageBox(NULL, path, "Path not found", MB_OK | MB_ICONWARNING);
-    } else if (attrs & FILE_ATTRIBUTE_DIRECTORY) {
-      strncpy(cliDir, path, cliDirSize - 1);
-      cliDir[cliDirSize - 1] = '\0';
-    } else if (is_note_ext(path)) {
-      char *slash;
-      strncpy(cliFile, path, cliFileSize - 1);
-      cliFile[cliFileSize - 1] = '\0';
-      slash = strrchr(cliFile, '\\');
-      if (slash) {
-        int dirlen = (int)(slash - cliFile);
-        memcpy(cliDir, cliFile, dirlen);
-        cliDir[dirlen] = '\0';
+      /* --config / -c switch (accept --config= or --config space) */
+      if (_stricmp(arg, "--config") == 0 && i + 1 < argc) {
+        i++;
+        WideCharToMultiByte(CP_ACP, 0, argvW[i], -1, arg, sizeof(arg), NULL, NULL);
+        strncpy(cfgPath, arg, cfgSize - 1);
+        cfgPath[cfgSize - 1] = '\0';
+      } else if ((arg[0] == '-' || arg[0] == '/') && arg[1] == 'c' && arg[2] == '=' && arg[3]) {
+        /* --config=path shorthand */
+        strncpy(cfgPath, arg + 3, cfgSize - 1);
+        cfgPath[cfgSize - 1] = '\0';
+      } else if (strncmp(arg, "-config=", 8) == 0) {
+        strncpy(cfgPath, arg + 8, cfgSize - 1);
+        cfgPath[cfgSize - 1] = '\0';
       } else {
-        GetCurrentDirectoryA(cliDirSize, cliDir);
+        /* positional: directory or file */
+        DWORD attrs = GetFileAttributes(arg);
+        if (attrs == INVALID_FILE_ATTRIBUTES) {
+          MessageBox(NULL, arg, "Path not found", MB_OK | MB_ICONWARNING);
+        } else if (attrs & FILE_ATTRIBUTE_DIRECTORY) {
+          strncpy(cliDir, arg, cliDirSize - 1);
+          cliDir[cliDirSize - 1] = '\0';
+        } else if (is_note_ext(arg)) {
+          char *slash;
+          strncpy(cliFile, arg, cliFileSize - 1);
+          cliFile[cliFileSize - 1] = '\0';
+          slash = strrchr(cliFile, '\\');
+          if (slash) {
+            int dirlen = (int)(slash - cliFile);
+            memcpy(cliDir, cliFile, dirlen);
+            cliDir[dirlen] = '\0';
+          } else {
+            GetCurrentDirectoryA(cliDirSize, cliDir);
+          }
+        } else {
+          MessageBox(NULL, arg, "Unsupported file type", MB_OK | MB_ICONWARNING);
+        }
       }
-    } else {
-      MessageBox(NULL, path, "Unsupported file type", MB_OK | MB_ICONWARNING);
     }
   }
   LocalFree(argvW);
@@ -273,9 +293,16 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrev, LPSTR cmdLine, int nShow) {
   (void)hPrev; (void)cmdLine;
   g_hInst = hInst;
 
-  config_load(&g_cfg, CFG_PATH);
-
-  ParseCommandLineArgs(g_cliDir, sizeof(g_cliDir), g_cliFile, sizeof(g_cliFile));
+  /* Resolve config file location (--config flag, search current dir, then
+     USERPROFILE). The resolved path is used for both load and save. */
+  {
+    char cli_cfg[MAX_PATH] = "";
+    const char *resolved_path;
+    ParseCommandLineArgs(g_cliDir, sizeof(g_cliDir), g_cliFile, sizeof(g_cliFile),
+                         cli_cfg, sizeof(cli_cfg));
+    resolved_path = config_resolve_path(cli_cfg);
+    config_load(&g_cfg, resolved_path);
+  }
 
   icc.dwSize = sizeof(icc);
   icc.dwICC = ICC_TREEVIEW_CLASSES;
@@ -1086,7 +1113,7 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPara
       }
       g_cfg.tree_w = g_treeW;
       if (!config_equal(&g_cfg, &saved))
-        config_save(&g_cfg, CFG_PATH);
+        config_save(&g_cfg, config_get_save_path());
     }
     if (g_editor_wtext) { free(g_editor_wtext); g_editor_wtext = NULL; }
     DestroyWindow(hWnd);

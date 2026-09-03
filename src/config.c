@@ -1,8 +1,55 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <windows.h>
+
 #include "config.h"
 #include "encoding.h"
+
+/* --- config path resolution --- */
+static char g_config_path[MAX_PATH]; /* where we last resolved/load/save */
+
+const char *config_resolve_path(const char *cli_path) {
+  char buf[MAX_PATH];
+
+  if (cli_path && cli_path[0]) {
+    /* explicit --config argument: use as-is (may be absolute or relative) */
+    GetFullPathNameA(cli_path, sizeof(g_config_path), g_config_path, NULL);
+    return g_config_path;
+  }
+
+  /* Search order: current dir first, then USERPROFILE */
+  GetCurrentDirectoryA(sizeof(buf), buf);
+  snprintf(buf + strlen(buf), sizeof(buf) - strlen(buf), "\\%s", CFG_FILENAME);
+  if (GetFileAttributesA(buf) != INVALID_FILE_ATTRIBUTES) {
+    strncpy(g_config_path, buf, sizeof(g_config_path) - 1);
+    g_config_path[sizeof(g_config_path) - 1] = '\0';
+    return g_config_path;
+  }
+
+  {
+    const char *home = getenv("USERPROFILE");
+    if (home && home[0]) {
+      snprintf(buf, sizeof(buf), "%s\\%s", home, CFG_FILENAME);
+      if (GetFileAttributesA(buf) != INVALID_FILE_ATTRIBUTES) {
+        strncpy(g_config_path, buf, sizeof(g_config_path) - 1);
+        g_config_path[sizeof(g_config_path) - 1] = '\0';
+        return g_config_path;
+      }
+    }
+  }
+
+  /* not found anywhere — default to current directory location */
+  GetCurrentDirectoryA(sizeof(buf), buf);
+  snprintf(buf + strlen(buf), sizeof(buf) - strlen(buf), "\\%s", CFG_FILENAME);
+  strncpy(g_config_path, buf, sizeof(g_config_path) - 1);
+  g_config_path[sizeof(g_config_path) - 1] = '\0';
+  return g_config_path;
+}
+
+const char *config_get_save_path(void) {
+  return g_config_path;
+}
 
 static void defaults(AppConfig *cfg) {
   cfg->win_x = 100;
