@@ -66,6 +66,7 @@ enum {
   IDM_CUT,
   IDM_COPY,
   IDM_PASTE,
+  IDM_SELECTALL,
   IDM_FIND,
   IDM_FINDNEXT,
   IDM_FINDPREV,
@@ -437,6 +438,14 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrev, LPSTR cmdLine, int nShow) {
       case 'O': id = IDM_OPEN; break;
       case 'S': id = g_curFile[0] ? IDM_SAVE : IDM_SAVEAS; break;
       case 'F': id = IDM_FIND; break;
+      case 'A': {                              /* select all in focused edit ctrl */
+        HWND hFocus = GetFocus();
+        if (hFocus == g_hEditor || hFocus == g_hSearch) {
+          SendMessage(hFocus, EM_SETSEL, 0, -1);
+          continue;
+        }
+        break;
+      }
       case 'Z': id = IDM_UNDO; break;
       case 'L': SetFocus(g_hSearch); break;   /* focus tree filter box */
       case VK_MULTIPLY: id = IDM_EXPANDALL; break;
@@ -563,6 +572,7 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPara
     AppendMenu(hEdit, MF_STRING, IDM_CUT, "Cu&t\tCtrl+X");
     AppendMenu(hEdit, MF_STRING, IDM_COPY, "&Copy\tCtrl+C");
     AppendMenu(hEdit, MF_STRING, IDM_PASTE, "&Paste\tCtrl+V");
+    AppendMenu(hEdit, MF_STRING, IDM_SELECTALL, "Select &All\tCtrl+A");
     AppendMenu(hEdit, MF_SEPARATOR, 0, NULL);
     AppendMenu(hEdit, MF_STRING, IDM_FIND, "&Find...\tCtrl+F");
     AppendMenu(hEdit, MF_STRING, IDM_FINDNEXT, "Find &Next\tF3");
@@ -736,6 +746,9 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPara
       break;
     case IDM_PASTE:
       SendMessage(g_hEditor, WM_PASTE, 0, 0);
+      break;
+    case IDM_SELECTALL:
+      SendMessage(g_hEditor, EM_SETSEL, 0, -1);
       break;
     case IDM_FIND:
       if (!g_hFindDlg) {
