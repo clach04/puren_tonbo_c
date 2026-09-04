@@ -1891,8 +1891,6 @@ static void SaveCurrentFile(void) {
         return;
       }
       /* TODO add support for safe save with command line tools that support that */
-  /* NOTE: encrypt path not yet verified end-to-end (child did not exit in
-   * smoke test); decrypt is the supported path for now. */
       if (crypto_encrypt_file(ct, g_curFile, bytes, (size_t)blen, pass, err, sizeof(err))) {
         free(bytes);
         MessageBox(g_hWnd, err, "Encryption failed", MB_OK | MB_ICONERROR);

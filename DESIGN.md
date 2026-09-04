@@ -172,11 +172,11 @@ additive.
 
 ### Runtime behaviour
 
-  * Decrypt: `CreateProcess` with `CREATE_NO_WINDOW`; tonbo reads the child's stdout via pipe; stderr captured for the error MessageBox; non-zero exit code, empty output, or launch failure is a hard error (nothing opened). **Tested working** (good and bad password, password_env)
-  * Encrypt: tonbo writes the full plaintext buffer to the child's stdin (pipe), then verifies the output file exists and is non-empty after successful exit. **Tested working** (test_crypto_api roundtrip; GUI smoke test)
+  * Decrypt: `CreateProcess` with `CREATE_NO_WINDOW`; tonbo reads the child's stdout via pipe; stderr captured for the error MessageBox; non-zero exit code, empty output, or launch failure is a hard error (nothing opened). **Tested working**
+  * Encrypt: tonbo writes the full plaintext buffer to the child's stdin (pipe), then verifies the output file exists and is non-empty after successful exit. **Tested working**
   * Password: always prompted via the existing GUI dialog (with the normal password cache); passed to the child only via `password_env`
   * `safe_save` / `paranoid_save` are bypassed for external-tool files (the child owns the output file). Future: support for tools that handle temp-file semantics themselves
-  * External extensions appear in the tree, open/save dialog filters; Save As with a configured extension encrypts via that tool (**NOT YET VERIFIED** in GUI)
+  * External extensions appear in the tree, open/save dialog filters; Save As with a configured extension encrypts via that tool. **Tested working**
   * Right-click Encrypt/Decrypt (bf01 conversions) is disabled for external-tool files
 
 ### Windows pipe spawn pitfalls (hard-won, do not regress)

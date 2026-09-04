@@ -29,9 +29,7 @@ int crypto_decrypt_file(const CryptoTool *tool, const char *path,
                         char *errmsg, size_t errsz);
 
 /* Encrypt data to path via tool (child reads plaintext from stdin and
- * writes the encrypted file). Returns 0 on success, else fills errmsg.
- * NOTE: not yet verified end-to-end (child process did not exit in smoke
- * test); GUI wiring is decrypt-only until fixed. */
+ * writes the encrypted file). Returns 0 on success, else fills errmsg. */
 int crypto_encrypt_file(const CryptoTool *tool, const char *path,
                         const char *data, size_t len, const char *pass,
                         char *errmsg, size_t errsz);
