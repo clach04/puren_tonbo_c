@@ -285,6 +285,22 @@ static void ParseCommandLineArgs(char *cliDir, int cliDirSize, char *cliFile,
       char arg[MAX_PATH];
       WideCharToMultiByte(CP_ACP, 0, argvW[i], -1, arg, sizeof(arg), NULL, NULL);
 
+      if (_stricmp(arg, "--help") == 0 || _stricmp(arg, "-h") == 0 ||
+          _stricmp(arg, "-?") == 0 || _stricmp(arg, "/?") == 0) {
+        MessageBox(NULL,
+          "tonbo [options] [path]\n"
+          "\n"
+          "path        Directory to browse, or a note file to open\n"
+          "            (tree rooted at its parent directory)\n"
+          "\n"
+          "options:\n"
+          "  --config <path>   Config file (also: -c <path>, -c=<path>,\n"
+          "                    --config=<path>, -config=<path>)\n"
+          "  -h, --help        Show this help and exit",
+          "tonbo", MB_OK | MB_ICONINFORMATION);
+        ExitProcess(0);
+      }
+
       /* --config / -c switch (accept --config= or --config space) */
       if (_stricmp(arg, "--config") == 0 && i + 1 < argc) {
         i++;
