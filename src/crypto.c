@@ -157,10 +157,14 @@ static int spawn(const char *cmd, int want_stdin, int want_stdout,
 
   memset(c, 0, sizeof(*c));
 
-  /* Pipes are created NON-inheritable; only the child's ends are made
-   * inheritable below, BEFORE CreateProcess. If both ends were inheritable,
-   * the child would inherit the parent's stdin write end and never see EOF
-   * (hangs forever waiting for more stdin). */
+  /* Pipes MUST be non-inheritable at CreateProcess time. With an
+   * inheritable SECURITY_ATTRIBUTES the child inherits the parent's stdin
+   * WRITE end, so the write end never closes and the child never sees EOF
+   * on stdin: it blocks forever on read, with empty stderr and zero bytes
+   * of output (must taskkill /F). Only the child's ends may be made
+   * inheritable, and only BEFORE CreateProcess - SetHandleInformation on
+   * the parent's copies after the spawn is too late, the child has already
+   * copied the handle table. See DESIGN.md "Windows pipe spawn pitfalls". */
   if (want_stdout && !CreatePipe(&out_r, &out_w, NULL, 0)) {
     snprintf(errmsg, errsz, "CreatePipe (stdout) failed, error %lu", GetLastError());
     return 1;
@@ -210,9 +214,10 @@ static int spawn(const char *cmd, int want_stdin, int want_stdout,
   c->hStdout = out_r;
   c->hStderr = err_r;
   c->hStdin = in_w;
-  /* Parent must not hold inheritable copies of the child's pipe ends,
-   * and the child must not inherit the parent's ends (otherwise the
-   * child never sees EOF on its stdin pipe). */
+  /* Belt and braces: parent ends are already non-inheritable (pipes were
+   * created without SECURITY_ATTRIBUTES); these calls are no-ops kept as
+   * guards against regression. Parent must close its copies of the
+   * child's ends below so EOF is delivered. */
   if (out_r) SetHandleInformation(out_r, HANDLE_FLAG_INHERIT, 0);
   SetHandleInformation(err_r, HANDLE_FLAG_INHERIT, 0);
   if (in_w) SetHandleInformation(in_w, HANDLE_FLAG_INHERIT, 0);

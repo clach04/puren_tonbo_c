@@ -173,11 +173,45 @@ additive.
 ### Runtime behaviour
 
   * Decrypt: `CreateProcess` with `CREATE_NO_WINDOW`; tonbo reads the child's stdout via pipe; stderr captured for the error MessageBox; non-zero exit code, empty output, or launch failure is a hard error (nothing opened). **Tested working** (good and bad password, password_env)
-  * Encrypt: tonbo writes the full plaintext buffer to the child's stdin (pipe), then verifies the output file exists and is non-empty after successful exit. **NOT YET VERIFIED**: smoke test showed the encrypt child never exiting; decrypt is the working path
+  * Encrypt: tonbo writes the full plaintext buffer to the child's stdin (pipe), then verifies the output file exists and is non-empty after successful exit. **Tested working** (test_crypto_api roundtrip; GUI smoke test)
   * Password: always prompted via the existing GUI dialog (with the normal password cache); passed to the child only via `password_env`
   * `safe_save` / `paranoid_save` are bypassed for external-tool files (the child owns the output file). Future: support for tools that handle temp-file semantics themselves
-  * External extensions appear in the tree, open/save dialog filters; Save As with a configured extension encrypts via that tool (unverified, see above)
+  * External extensions appear in the tree, open/save dialog filters; Save As with a configured extension encrypts via that tool (**NOT YET VERIFIED** in GUI)
   * Right-click Encrypt/Decrypt (bf01 conversions) is disabled for external-tool files
+
+### Windows pipe spawn pitfalls (hard-won, do not regress)
+
+These cost two debugging sessions to find. They apply to any code that
+spawns a child with pipes (see `spawn()` in src/crypto.c).
+
+  * **Never create pipes with an inheritable SECURITY_ATTRIBUTES when the
+    child should not inherit the parent's ends.** With both ends
+    inheritable at CreateProcess time, the child inherits the parent's
+    stdin WRITE end. The parent closes its copy after writing, but the
+    child's own inherited copy keeps the pipe open forever, so the child
+    never sees EOF on stdin: it blocks reading stdin indefinitely, with
+    empty stderr and zero bytes of output. Symptom: hang right after
+    spawn, must `taskkill /F`. The env block was suspected first (see
+    below) and was NOT the cause.
+  * **SetHandleInformation after CreateProcess is too late.** The child
+    copies the parent's handle table at spawn time; clearing the inherit
+    flag on the parent's copy afterwards does not remove the child's
+    copy. Child ends must be marked inheritable (and parent ends must
+    already be non-inheritable) BEFORE CreateProcess. Simplest correct
+    recipe: `CreatePipe(..., NULL, 0)` (non-inheritable), then
+    `SetHandleInformation(child_end, HANDLE_FLAG_INHERIT,
+    HANDLE_FLAG_INHERIT)` on exactly the ends the child needs, then
+    CreateProcess with bInheritHandles=TRUE.
+  * **Child env blocks must be duplicate-free.** Windows requires a
+    sorted, duplicate-free `NAME=value` list. `build_env_block` replaces
+    any pre-existing entry of the password env var instead of appending
+    a second copy. Duplicates are undefined behavior and have caused
+    corrupted child startup in the past.
+  * **Agent/CI sandbox caveat:** automated bash sandboxes could not
+    reproduce or verify this bug (CreatePipe with inheritable
+    SECURITY_ATTRIBUTES fails there with error 1305, and grandchild
+    processes break output capture). Verification must be done on the
+    real machine (API-level test or GUI).
 
 ### Glossary
 
