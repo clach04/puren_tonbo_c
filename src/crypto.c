@@ -71,18 +71,27 @@ overflow:
 
 /* --- environment --- */
 
-/* Build an env block: parent environment plus name=pass. Returns malloc'd
+/* Build an env block: parent environment plus name=pass. If name already
+ * exists in the parent environment it is REPLACED, not duplicated -
+ * duplicate variables in an env block are undefined behavior and can
+ * make the child fail at startup (e.g. python raising a hidden error
+ * dialog under CREATE_NO_WINDOW -> child hangs forever). Returns malloc'd
  * block (free with free()) or NULL on failure. */
 static char *build_env_block(const char *name, const char *pass) {
   LPCH parent = GetEnvironmentStringsA();
   char *block, *w;
-  size_t total, passlen;
+  size_t total, passlen, namelen = strlen(name);
   LPCH p;
   if (!parent) return NULL;
-  passlen = strlen(name) + strlen(pass) + 2;
+  passlen = namelen + strlen(pass) + 2;
   total = passlen + 1;
   for (p = parent; *p; ) {
     size_t len = strlen(p) + 1;
+    /* skip existing copy of name=... (replaced by our entry below) */
+    if (_strnicmp(p, name, namelen) == 0 && p[namelen] == '=') {
+      p += len;
+      continue;
+    }
     total += len;
     p += len;
   }
@@ -91,13 +100,17 @@ static char *build_env_block(const char *name, const char *pass) {
   w = block;
   for (p = parent; *p; ) {
     size_t len = strlen(p) + 1;
+    if (_strnicmp(p, name, namelen) == 0 && p[namelen] == '=') {
+      p += len;
+      continue;
+    }
     memcpy(w, p, len);
     w += len;
     p += len;
   }
   FreeEnvironmentStringsA(parent);
-  memcpy(w, name, strlen(name));
-  w += strlen(name);
+  memcpy(w, name, namelen);
+  w += namelen;
   *w++ = '=';
   memcpy(w, pass, strlen(pass));
   w += strlen(pass);
@@ -140,26 +153,26 @@ static int spawn(const char *cmd, int want_stdin, int want_stdout,
                  char *env_block, ChildProc *c, char *errmsg, size_t errsz) {
   STARTUPINFO si;
   PROCESS_INFORMATION pi;
-  SECURITY_ATTRIBUTES sa;
   HANDLE out_r = NULL, out_w = NULL, err_r = NULL, err_w = NULL, in_r = NULL, in_w = NULL;
 
   memset(c, 0, sizeof(*c));
-  sa.nLength = sizeof(sa);
-  sa.bInheritHandle = TRUE;
-  sa.lpSecurityDescriptor = NULL;
 
-  if (want_stdout && !CreatePipe(&out_r, &out_w, &sa, 0)) {
+  /* Pipes are created NON-inheritable; only the child's ends are made
+   * inheritable below, BEFORE CreateProcess. If both ends were inheritable,
+   * the child would inherit the parent's stdin write end and never see EOF
+   * (hangs forever waiting for more stdin). */
+  if (want_stdout && !CreatePipe(&out_r, &out_w, NULL, 0)) {
     snprintf(errmsg, errsz, "CreatePipe (stdout) failed, error %lu", GetLastError());
     return 1;
   }
-  if (!CreatePipe(&err_r, &err_w, &sa, 0)) {
+  if (!CreatePipe(&err_r, &err_w, NULL, 0)) {
     snprintf(errmsg, errsz, "CreatePipe (stderr) failed, error %lu", GetLastError());
     child_close(c);
     if (out_r) CloseHandle(out_r);
     if (out_w) CloseHandle(out_w);
     return 1;
   }
-  if (want_stdin && !CreatePipe(&in_r, &in_w, &sa, 0)) {
+  if (want_stdin && !CreatePipe(&in_r, &in_w, NULL, 0)) {
     snprintf(errmsg, errsz, "CreatePipe (stdin) failed, error %lu", GetLastError());
     if (out_r) CloseHandle(out_r);
     if (out_w) CloseHandle(out_w);
@@ -174,6 +187,10 @@ static int spawn(const char *cmd, int want_stdin, int want_stdout,
   si.hStdInput = want_stdin ? in_r : GetStdHandle(STD_INPUT_HANDLE);
   si.hStdOutput = want_stdout ? out_w : GetStdHandle(STD_OUTPUT_HANDLE);
   si.hStdError = err_w;
+  /* make ONLY the child's pipe ends inheritable (parent ends stay private) */
+  if (out_w) SetHandleInformation(out_w, HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT);
+  SetHandleInformation(err_w, HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT);
+  if (in_r) SetHandleInformation(in_r, HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT);
 
   ZeroMemory(&pi, sizeof(pi));
   if (!CreateProcessA(NULL, (char *)cmd, NULL, NULL, TRUE,
