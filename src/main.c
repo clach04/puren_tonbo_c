@@ -5,6 +5,8 @@
 #include <shellapi.h>
 #include <richedit.h>
 #include <stdio.h>
+#include <io.h>
+#include <fcntl.h>
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
@@ -263,6 +265,72 @@ static int CopyTextToClipboard(HWND hWnd, const char *text) {
   return 0;
 }
 
+/* When set via --stdout, help/diagnostics go to the parent console
+   instead of a MessageBox.  Only meaningful when launched from a terminal. */
+static int g_stdout = 0;
+
+/* Returns 1 if usage was printed to the parent console.
+   If anything fails (no terminal parent, console write error),
+   returns 0 so the caller can fall back to a MessageBox.  Failure
+   reason is logged to %TEMP%\tonbo_stdout_err.txt for diagnosis.
+   Attach sequence: AttachConsole(ATTACH_PARENT_PROCESS) then
+   CreateFileA("CONOUT$") then WriteConsoleA.
+
+   Gotchas learned the hard way:
+   - MinGW stdio does NOT render on the attached console: both
+     freopen("CONOUT$") and the _open_osfhandle/_dup2(fd,1) chain
+     succeeded yet nothing appeared on screen.  Writing via
+     WriteConsoleA on the raw CONOUT$ handle is what actually works,
+     so we use it exclusively (hence the explicit \r\n line endings).
+   - The exe must be GUI-subsystem (-mwindows).  It was previously
+     console-subsystem (CUI): launched from cmd it already owned a
+     console, so AttachConsole failed with ERROR_ACCESS_DENIED (5),
+     and double-clicking from Explorer held a console window open.
+   - MSYS/bash pipes are not Windows consoles, so this path always
+     falls back to MessageBox under those shells; test in real cmd.
+   - Being GUI-subsystem, cmd does not wait for us: the prompt may
+     print before the help text appears.  Cosmetic, not fixable
+     without returning to console-subsystem. */
+static int ShowUsage(void) {
+  static const char usage[] =
+    "tonbo [options] [path]\r\n"
+    "\r\n"
+    "path        Directory to browse, or a note file to open\r\n"
+    "            (tree rooted at its parent directory)\r\n"
+    "\r\n"
+    "options:\r\n"
+    "  --config <path>   Config file (also: -c <path>, -c=<path>,\r\n"
+    "                    --config=<path>, -config=<path>)\r\n"
+    "  --stdout          Print help/diagnostics to parent console\r\n"
+    "  -h, --help        Show this help and exit\r\n";
+  HANDLE con;
+  DWORD written = 0, err;
+  FILE *errlog;
+  char path[MAX_PATH];
+
+  if (!AttachConsole(ATTACH_PARENT_PROCESS)) {
+    err = GetLastError();
+    goto fail;
+  }
+  con = CreateFileA("CONOUT$", GENERIC_WRITE, FILE_SHARE_WRITE, NULL,
+                    OPEN_EXISTING, 0, NULL);
+  if (con == INVALID_HANDLE_VALUE) { err = GetLastError(); goto fail; }
+  if (!WriteConsoleA(con, usage, sizeof(usage) - 1, &written, NULL) ||
+      written != sizeof(usage) - 1) {
+    err = GetLastError();
+    goto fail;
+  }
+  return 1;
+
+fail:
+  if (GetTempPathA(MAX_PATH, path)) {
+    strcat(path, "tonbo_stdout_err.txt");
+    errlog = fopen(path, "w");
+    if (errlog) { fprintf(errlog, "ShowUsage failed, code=%lu\n", (unsigned long)err); fclose(errlog); }
+  }
+  return 0;
+}
+
 /* Parse command line: supports --config <path>, plus single optional
    positional argument which is either a directory (tree root) or a file
    (open in editor, tree rooted at its parent directory).  Uses wide
@@ -285,19 +353,25 @@ static void ParseCommandLineArgs(char *cliDir, int cliDirSize, char *cliFile,
       char arg[MAX_PATH];
       WideCharToMultiByte(CP_ACP, 0, argvW[i], -1, arg, sizeof(arg), NULL, NULL);
 
+      /* --stdout: print help/diagnostics to parent console instead of a
+         MessageBox; requires AttachConsole, so must run from a terminal */
+      if (_stricmp(arg, "--stdout") == 0) { g_stdout = 1; continue; }
+
       if (_stricmp(arg, "--help") == 0 || _stricmp(arg, "-h") == 0 ||
           _stricmp(arg, "-?") == 0 || _stricmp(arg, "/?") == 0) {
+        if (g_stdout && ShowUsage()) ExitProcess(0);
         MessageBox(NULL,
-          "tonbo [options] [path]\n"
-          "\n"
-          "path        Directory to browse, or a note file to open\n"
-          "            (tree rooted at its parent directory)\n"
-          "\n"
-          "options:\n"
-          "  --config <path>   Config file (also: -c <path>, -c=<path>,\n"
-          "                    --config=<path>, -config=<path>)\n"
-          "  -h, --help        Show this help and exit",
-          "tonbo", MB_OK | MB_ICONINFORMATION);
+            "tonbo [options] [path]\n"
+            "\n"
+            "path        Directory to browse, or a note file to open\n"
+            "            (tree rooted at its parent directory)\n"
+            "\n"
+            "options:\n"
+            "  --config <path>   Config file (also: -c <path>, -c=<path>,\n"
+            "                    --config=<path>, -config=<path>)\n"
+            "  --stdout          Print help/diagnostics to parent console\n"
+            "  -h, --help        Show this help and exit",
+            "tonbo", MB_OK | MB_ICONINFORMATION);
         ExitProcess(0);
       }
 
