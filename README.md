@@ -92,6 +92,7 @@ encoding_list=utf8,cp1252
 
 [word]
 word_wrap=0
+fuzzy_search=0
 
 [external]
 name_1=Scite
@@ -102,6 +103,28 @@ name_3=Notepad++
 exe_3=C:\Program Files\Notepad++\notepad++.exe
 name_4=VS Code
 exe_4=code
+
+
+; External encryption binary (or tool) support.
+; One [crypto.NAME] section per tool:
+;   extensions   - space separated, each with leading dot
+;   password_env - env var name tonbo sets (in the child's environment) to
+;                  the password entered in the GUI prompt; the tool must
+;                  support reading the password from that env var
+;   decrypt_cmd  - {FILENAME} = encrypted input file; tool writes plain
+;                  text to stdout
+;   encrypt_cmd  - {FILENAME} = encrypted output file; tonbo writes plain
+;                  text to the tool's stdin; tool writes the file itself
+;                  NOTE: encrypt is not yet verified end-to-end; decrypt
+;                  is the working path
+; Placeholders: {FILENAME} only. safe_save is not used for these files.
+; Example:
+;[crypto.rot13]
+;extensions=.rot13
+;password_env=PTCIPHER_PASSWORD
+;decrypt_cmd=C:\code\py\py311venv\Scripts\ptcipher.exe --force-newline dos --decrypt --output=- --password-env PTCIPHER_PASSWORD {FILENAME}
+;encrypt_cmd=C:\code\py\py311venv\Scripts\ptcipher.exe --force-newline dos --silent --encrypt --password-env PTCIPHER_PASSWORD {FILENAME}
+
 ```
 
   * `safe_save` - Write to temp file first, then rename. Default: 1 (on)
